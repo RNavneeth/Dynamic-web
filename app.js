@@ -2008,7 +2008,1393 @@ dbDisconnectBtn?.addEventListener('click', () => {
     setTimeout(() => {
         window.location.reload();
     }, 800);
+    dbModal.classList.remove('active');
+    updateDBStatusUI(false);
+    
+    setTimeout(() => {
+        window.location.reload();
+    }, 800);
 });
+
+// ==========================================================================
+// 14. DUAL-STATE CORE MANAGERS (AUTHENTICATION, TEAMS, TOURNAMENTS, STORE)
+// ==========================================================================
+
+// Extended Global State Parameters
+state.currentUser = null;
+state.myTeam = null;
+state.myInvitations = [];
+state.friendRequests = [];
+state.messages = { global: [], squad: [], private: [] };
+state.activeChatRoom = 'global';
+state.forumPosts = [];
+state.gamerCredits = parseInt(localStorage.getItem('vortexCredits') || '500');
+
+// Cyber Sound Effects Matrix
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function playCyberBeep(freq = 600, duration = 0.08, type = 'sine') {
+    try {
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gainNode.gain.setValueAtTime(0.04, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+    } catch (e) {
+        // Audio context suspended or blocked
+    }
+}
+
+// --------------------------------------------------------------------------
+// 14.1 AUTHENTICATION MANAGER (SESSION CONTROL PORTAL)
+// --------------------------------------------------------------------------
+class AuthManager {
+    constructor() {
+        this.modal = document.getElementById('auth-modal');
+        this.closeBtn = document.getElementById('auth-modal-close');
+        this.form = document.getElementById('auth-form');
+        this.tabLogin = document.getElementById('auth-tab-login');
+        this.tabRegister = document.getElementById('auth-tab-register');
+        this.forgotLink = document.getElementById('auth-forgot-link');
+        this.feedbackBox = document.getElementById('auth-feedback-box');
+        this.submitBtn = document.getElementById('auth-submit-btn');
+        this.titleText = document.getElementById('auth-modal-title-text');
+        
+        this.mode = 'login'; // login, register, forgot
+        
+        this.bindEvents();
+        this.checkExistingSession();
+    }
+
+    bindEvents() {
+        this.closeBtn?.addEventListener('click', () => this.hide());
+        this.tabLogin?.addEventListener('click', () => this.switchMode('login'));
+        this.tabRegister?.addEventListener('click', () => this.switchMode('register'));
+        this.forgotLink?.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.switchMode('forgot');
+        });
+        
+        this.form?.addEventListener('submit', (e) => this.handleSubmit(e));
+        
+        // Trigger profile card click to open auth modal if not signed in
+        document.getElementById('pd-avatar')?.addEventListener('click', () => {
+            if (!state.currentUser) this.show();
+        });
+        document.getElementById('header-avatar')?.addEventListener('click', () => {
+            if (!state.currentUser) {
+                this.show();
+            } else {
+                triggerToast(`Signed in as ${state.currentUser.username}`, "info");
+            }
+        });
+    }
+
+    show() {
+        this.modal?.classList.add('active');
+        this.switchMode('login');
+    }
+
+    hide() {
+        this.modal?.classList.remove('active');
+    }
+
+    switchMode(newMode) {
+        this.mode = newMode;
+        this.feedbackBox.style.display = 'none';
+        
+        const userGroup = document.getElementById('auth-group-username');
+        const passGroup = document.getElementById('auth-group-password');
+        const verifyNotice = document.getElementById('auth-verify-notice');
+        
+        if (newMode === 'login') {
+            this.titleText.textContent = "VORTEX CORE SECURITY";
+            if (userGroup) userGroup.style.display = 'none';
+            if (passGroup) passGroup.style.display = 'block';
+            if (verifyNotice) verifyNotice.style.display = 'none';
+            this.tabLogin.classList.add('active');
+            this.tabRegister.classList.remove('active');
+            this.submitBtn.innerHTML = `<span><i class="fa-solid fa-right-to-bracket"></i> Initialize Authentication</span>`;
+        } else if (newMode === 'register') {
+            this.titleText.textContent = "REGISTER NEW ALIAS";
+            if (userGroup) userGroup.style.display = 'block';
+            if (passGroup) passGroup.style.display = 'block';
+            if (verifyNotice) verifyNotice.style.display = 'block';
+            this.tabLogin.classList.remove('active');
+            this.tabRegister.classList.add('active');
+            this.submitBtn.innerHTML = `<span><i class="fa-solid fa-user-plus"></i> Provision Account Protocol</span>`;
+        } else if (newMode === 'forgot') {
+            this.titleText.textContent = "RESET PASS-PHRASE";
+            if (userGroup) userGroup.style.display = 'none';
+            if (passGroup) passGroup.style.display = 'none';
+            if (verifyNotice) verifyNotice.style.display = 'none';
+            this.submitBtn.innerHTML = `<span><i class="fa-solid fa-envelope"></i> Request Reset Secure Key</span>`;
+        }
+    }
+
+    async handleSubmit(e) {
+        e.preventDefault();
+        const email = document.getElementById('auth-email').value.trim();
+        const password = document.getElementById('auth-password')?.value || '';
+        const username = document.getElementById('auth-username')?.value.trim() || '';
+
+        this.submitBtn.disabled = true;
+        
+        try {
+            if (dbState.isConnected && dbState.client) {
+                // Live Supabase Authentication
+                if (this.mode === 'register') {
+                    const { data, error } = await dbState.client.auth.signUp({
+                        email,
+                        password,
+                        options: { data: { username } }
+                    });
+                    if (error) throw error;
+                    triggerToast("Account verification transmission dispatched. Check your email!", "info");
+                    this.hide();
+                } else if (this.mode === 'login') {
+                    const { data, error } = await dbState.client.auth.signInWithPassword({ email, password });
+                    if (error) throw error;
+                    
+                    // Fetch profile details
+                    const { data: profile, error: pErr } = await dbState.client
+                        .from('profiles')
+                        .select('*')
+                        .eq('id', data.user.id)
+                        .single();
+                        
+                    state.currentUser = profile || {
+                        id: data.user.id,
+                        username: username || email.split('@')[0],
+                        avatar_url: `https://api.dicebear.com/7.x/adventurer/svg?seed=${data.user.id}`,
+                        wins: 0,
+                        losses: 0,
+                        xp: 0,
+                        role: 'Gamer',
+                        credits: 500
+                    };
+                    
+                    triggerToast(`Link Authenticated! Greeting Agent ${state.currentUser.username}`, "success");
+                    this.hide();
+                    this.syncUserSessionUI();
+                } else if (this.mode === 'forgot') {
+                    const { error } = await dbState.client.auth.resetPasswordForEmail(email);
+                    if (error) throw error;
+                    triggerToast("Password reset link dispatched securely.", "success");
+                    this.hide();
+                }
+            } else {
+                // Offline high-fidelity mock session fallbacks
+                if (this.mode === 'register') {
+                    triggerToast("Fallback Server Offline: Account provisioned locally!", "success");
+                    this.switchMode('login');
+                } else if (this.mode === 'login') {
+                    state.currentUser = {
+                        id: 'mock-uuid-882194',
+                        username: email.split('@')[0],
+                        avatar_url: `https://api.dicebear.com/7.x/adventurer/svg?seed=${email}`,
+                        wins: 143,
+                        losses: 67,
+                        kd_ratio: 2.13,
+                        xp: 85,
+                        role: email.includes('admin') ? 'Admin' : 'Gamer',
+                        credits: state.gamerCredits,
+                        status: 'Active'
+                    };
+                    triggerToast(`Welcome back, ${state.currentUser.username} (Local Fallback Mode)`, "success");
+                    this.hide();
+                    this.syncUserSessionUI();
+                } else if (this.mode === 'forgot') {
+                    triggerToast("Password reset request logged in client memory.", "info");
+                    this.hide();
+                }
+            }
+            playCyberBeep(800, 0.15);
+        } catch (err) {
+            console.error("Auth Failure:", err);
+            this.feedbackBox.style.display = 'block';
+            this.feedbackBox.textContent = `Security Rejection: ${err.message || err}`;
+            playCyberBeep(250, 0.25, 'sawtooth');
+        } finally {
+            this.submitBtn.disabled = false;
+        }
+    }
+
+    async checkExistingSession() {
+        if (dbState.isConnected && dbState.client) {
+            const { data: { session } } = await dbState.client.auth.getSession();
+            if (session) {
+                const { data: profile } = await dbState.client
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', session.user.id)
+                    .single();
+                state.currentUser = profile || {
+                    id: session.user.id,
+                    username: session.user.user_metadata?.username || session.user.email.split('@')[0],
+                    avatar_url: `https://api.dicebear.com/7.x/adventurer/svg?seed=${session.user.id}`,
+                    wins: 0,
+                    losses: 0,
+                    xp: 0,
+                    role: 'Gamer',
+                    credits: 500
+                };
+                this.syncUserSessionUI();
+            }
+        } else {
+            // Keep default mock user active for visual consistency
+            state.currentUser = {
+                id: 'mock-alex-uuid',
+                username: "Alex Ryan",
+                avatar_url: "https://api.dicebear.com/7.x/adventurer/svg?seed=Alex",
+                wins: 143,
+                losses: 67,
+                kd_ratio: 2.13,
+                xp: 85,
+                role: 'Admin', // default to let user test Admin features immediately!
+                credits: state.gamerCredits,
+                status: 'Active'
+            };
+            this.syncUserSessionUI();
+        }
+    }
+
+    syncUserSessionUI() {
+        if (!state.currentUser) return;
+        
+        // Sync static client states
+        state.userProfile.username = state.currentUser.username;
+        state.userProfile.avatar = state.currentUser.avatar_url;
+        state.userProfile.wins = state.currentUser.wins || 143;
+        state.userProfile.matches = (state.currentUser.wins || 143) + (state.currentUser.losses || 67);
+        state.userProfile.rank = state.currentUser.role === 'Admin' ? 'Nexus Moderator' : 'Elite Grandmaster';
+        state.userProfile.xp = state.currentUser.xp || 85;
+        
+        syncGamerProfileUI();
+        
+        // Reveal Admin links if user is Administrator/Moderator
+        const adminSidebarLink = document.getElementById('sidebar-admin-link');
+        if (adminSidebarLink) {
+            adminSidebarLink.style.display = state.currentUser.role === 'Admin' ? 'flex' : 'none';
+        }
+        
+        // Load submanager components
+        window.teamManager?.refresh();
+        window.communityManager?.refresh();
+        window.storeManager?.refresh();
+        window.adminManager?.refresh();
+    }
+}
+
+// --------------------------------------------------------------------------
+// 14.2 TOURNAMENTS HUB MANAGER (DAMPED REAL-TIME BRACKETS)
+// --------------------------------------------------------------------------
+class TournamentManager {
+    constructor() {
+        this.container = document.getElementById('tournaments-grid-container');
+        this.filters = document.querySelectorAll('#tournament-status-filters button');
+        this.activeFilter = 'upcoming';
+        
+        this.bindEvents();
+        this.renderTournaments();
+    }
+
+    bindEvents() {
+        this.filters.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                this.filters.forEach(f => f.classList.remove('active'));
+                btn.classList.add('active');
+                this.activeFilter = btn.getAttribute('data-t-status');
+                this.renderTournaments();
+                playCyberBeep(700, 0.05);
+            });
+        });
+    }
+
+    async renderTournaments() {
+        if (!this.container) return;
+        
+        this.container.innerHTML = `<div class="spinner" style="margin: 40px auto; grid-column: 1/-1;"></div>`;
+        
+        let list = [...COUNTDOWN_TOURNAMENTS];
+        
+        if (dbState.isConnected && dbState.client) {
+            try {
+                const { data } = await dbState.client.from('tournaments').select('*');
+                if (data && data.length > 0) {
+                    list = data.map(t => ({
+                        id: t.id,
+                        title: t.title,
+                        game: t.game,
+                        date: t.date,
+                        prize: t.prize,
+                        totalSlots: t.total_slots,
+                        registeredCount: t.registered_count
+                    }));
+                }
+            } catch (err) {
+                console.error("Failed to query tournaments:", err);
+            }
+        }
+        
+        // Filter based on dates
+        const now = new Date().getTime();
+        const filtered = list.filter(t => {
+            const time = new Date(t.date).getTime();
+            if (this.activeFilter === 'upcoming') return time > now;
+            if (this.activeFilter === 'ongoing') return time <= now && time + 86400000 * 2 > now; // Active for 2 days
+            return time + 86400000 * 2 <= now;
+        });
+
+        if (filtered.length === 0) {
+            this.container.innerHTML = `
+                <div class="glass-card" style="padding: 40px; text-align: center; grid-column: 1/-1; border-color: rgba(255,255,255,0.05);">
+                    <i class="fa-solid fa-globe" style="font-size: 2.5rem; color: var(--color-text-muted); margin-bottom: 15px;"></i>
+                    <h4 style="color: #fff;">No entries active on this quadrant.</h4>
+                    <p style="color: var(--color-text-muted); font-size: 0.85rem; margin-top: 5px;">Check back shortly for season calendars.</p>
+                </div>
+            `;
+            return;
+        }
+
+        this.container.innerHTML = filtered.map(t => {
+            const slotsPct = Math.round((t.registeredCount / t.totalSlots) * 100);
+            return `
+                <div class="glass-card" style="padding: 25px; border-color: rgba(139,92,246,0.15); display: flex; flex-direction: column; justify-content: space-between;">
+                    <div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                            <span class="badge-pill" style="font-size: 0.75rem; background: rgba(139,92,246,0.1); border-color: rgba(139,92,246,0.3); color: var(--color-accent-purple);">${t.game}</span>
+                            <span style="font-size: 1.1rem; font-weight: 800; color: var(--color-accent-pink);">${t.prize}</span>
+                        </div>
+                        <h3 style="margin-bottom: 10px; font-family: var(--font-heading); color: #fff;">${t.title}</h3>
+                        <p style="font-size: 0.85rem; color: var(--color-text-muted); margin-bottom: 20px;">
+                            <i class="fa-regular fa-calendar-check" style="margin-right: 5px;"></i> Scheduled: ${new Date(t.date).toLocaleDateString()}
+                        </p>
+                        
+                        <div style="margin-bottom: 20px;">
+                            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 6px;">
+                                <span>Roster Capacity</span>
+                                <span>${t.registeredCount}/${t.totalSlots} Teams</span>
+                            </div>
+                            <div style="height: 6px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden;">
+                                <div style="height: 100%; width: ${slotsPct}%; background: linear-gradient(90deg, var(--color-accent-purple), var(--color-accent-pink));"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-outline" style="flex: 1; padding: 10px; font-size: 0.85rem;" onclick="viewTournamentDetails('${t.id}')">Leagues Info</button>
+                        ${this.activeFilter === 'upcoming' ? `
+                            <button class="btn btn-primary btn-glow" style="flex: 1.5; padding: 10px; font-size: 0.85rem;" onclick="window.tournamentManager.registerForTournament('${t.id}', '${t.title.replace(/'/g, "\\'")}')">Register Crew</button>
+                        ` : `
+                            <button class="btn btn-primary btn-glow" style="flex: 1.5; padding: 10px; font-size: 0.85rem;" onclick="window.location.hash='#tournaments'">Monitor Bracket</button>
+                        `}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    async registerForTournament(tourneyId, title) {
+        if (!state.currentUser) {
+            triggerToast("Secure Identity Authentication required to register competitive rosters!", "warning");
+            window.authManager.show();
+            return;
+        }
+
+        const teamName = prompt(`Input Squad / Team Name for ${title}:`, `${state.currentUser.username} Squad`);
+        if (!teamName) return;
+
+        const discord = prompt("Input captain's Discord handle for server communication seed:", "@myalias#1234");
+        if (!discord) return;
+
+        triggerToast(`Transmitting team ${teamName} validation tokens...`, "info");
+        playCyberBeep(500, 0.1);
+
+        try {
+            if (dbState.isConnected && dbState.client) {
+                // Live Supabase Insert
+                const { error: insErr } = await dbState.client
+                    .from('tournament_registrations')
+                    .insert({
+                        tournament_id: tourneyId,
+                        team_name: teamName,
+                        captain_discord: discord,
+                        region: 'Global Array'
+                    });
+                if (insErr) throw insErr;
+                
+                // Get current registration count
+                const { data: tourney } = await dbState.client.from('tournaments').select('registered_count').eq('id', tourneyId).single();
+                const newCount = (tourney?.registered_count || 0) + 1;
+                
+                await dbState.client.from('tournaments').update({ registered_count: newCount }).eq('id', tourneyId);
+            }
+            
+            // Local model update
+            const localTourney = COUNTDOWN_TOURNAMENTS.find(t => t.id === tourneyId);
+            if (localTourney) {
+                localTourney.registeredCount++;
+            }
+            
+            triggerToast(`Roster verified successfully for ${title}! Ready up!`, "success");
+            playCyberBeep(900, 0.2);
+            this.renderTournaments();
+        } catch (err) {
+            console.error("Roster registration failure:", err);
+            triggerToast("Esports registration transmission rejected by network.", "danger");
+        }
+    }
+}
+
+// --------------------------------------------------------------------------
+// 14.3 SQUAD & TEAM MANAGEMENT MANAGER ( alliances & logs )
+// --------------------------------------------------------------------------
+class TeamManager {
+    constructor() {
+        this.container = document.getElementById('team-squad-dashboard');
+        this.refresh();
+    }
+
+    async refresh() {
+        if (!this.container) return;
+        
+        this.container.innerHTML = `<div class="spinner" style="margin: 40px auto;"></div>`;
+        
+        if (!state.currentUser) {
+            this.container.innerHTML = `
+                <div class="glass-card" style="padding: 50px 30px; text-align: center; border-color: rgba(255,255,255,0.05);">
+                    <i class="fa-solid fa-shield-halved" style="font-size: 3rem; color: var(--color-text-muted); margin-bottom: 20px;"></i>
+                    <h3 style="color: #fff;">Squad Core Protocol Inactive</h3>
+                    <p style="color: var(--color-text-muted); font-size: 0.9rem; margin-top: 8px; max-width: 450px; margin-left: auto; margin-right: auto;">
+                        Sync a secure user identity to assemble custom squads, recruit global pilots, and direct visual logo seeds.
+                    </p>
+                    <button class="btn btn-primary btn-glow" style="margin-top: 20px;" onclick="window.authManager.show()"><i class="fa-solid fa-user-lock"></i> Initialize Authentication</button>
+                </div>
+            `;
+            return;
+        }
+
+        // Search if user has created or belongs to a team
+        let userTeam = null;
+        let members = [];
+        
+        if (dbState.isConnected && dbState.client) {
+            try {
+                // Query my team membership
+                const { data: memberMap } = await dbState.client
+                    .from('team_members')
+                    .select('team_id, role')
+                    .eq('profile_id', state.currentUser.id)
+                    .maybeSingle();
+                    
+                if (memberMap) {
+                    const { data: team } = await dbState.client.from('teams').select('*').eq('id', memberMap.team_id).single();
+                    userTeam = team;
+                    
+                    const { data: roster } = await dbState.client
+                        .from('team_members')
+                        .select('role, profiles(username, avatar_url, wins, kd_ratio)')
+                        .eq('team_id', team.id);
+                        
+                    members = roster.map(r => ({
+                        username: r.profiles.username,
+                        avatar: r.profiles.avatar_url,
+                        wins: r.profiles.wins,
+                        kd: r.profiles.kd_ratio,
+                        role: r.role
+                    }));
+                }
+            } catch (err) {
+                console.error("Squad sync error:", err);
+            }
+        } else {
+            // Local mockup fallback
+            userTeam = state.myTeam;
+            if (userTeam) {
+                members = [
+                    { username: state.currentUser.username, avatar: state.currentUser.avatar_url, wins: state.currentUser.wins, kd: 2.13, role: 'Leader' },
+                    { username: "NeonShadow", avatar: "https://api.dicebear.com/7.x/adventurer/svg?seed=Shadow", wins: 314, kd: 2.98, role: 'Roster Combatant' }
+                ];
+            }
+        }
+
+        if (!userTeam) {
+            // RENDER TEAM CREATION CREW
+            this.container.innerHTML = `
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; align-items: start;">
+                    <div class="glass-card" style="padding: 30px;">
+                        <h3 style="margin-bottom: 15px;"><i class="fa-solid fa-plus" style="color: var(--color-accent-pink);"></i> Deploy Roster Alliance</h3>
+                        <p style="color: var(--color-text-secondary); font-size: 0.9rem; margin-bottom: 25px;">Register a competitive alliance tag, claim a custom visual emblem, and unlock dynamic squad stats tracking.</p>
+                        
+                        <form id="team-create-form" style="display: flex; flex-direction: column; gap: 15px;">
+                            <div class="form-group">
+                                <label for="team-tag-name">Squad Alliance Name</label>
+                                <input type="text" id="team-tag-name" placeholder="e.g. Apex Vanguard" required style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); padding: 12px; border-radius: 8px; width: 100%; color: #fff;">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="team-desc">Alliance Protocol Focus</label>
+                                <textarea id="team-desc" rows="3" placeholder="Define competitive directives..." required style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); padding: 12px; border-radius: 8px; width: 100%; color: #fff; resize: none;"></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Alliance Visual Emblem Seed</label>
+                                <div style="display: flex; gap: 10px; margin-top: 8px;" id="emblem-selectors-container">
+                                    <button type="button" class="btn btn-outline emblem-btn active" data-seed="Viper" style="padding: 10px; flex: 1;">Viper</button>
+                                    <button type="button" class="btn btn-outline emblem-btn" data-seed="Phoenix" style="padding: 10px; flex: 1;">Phoenix</button>
+                                    <button type="button" class="btn btn-outline emblem-btn" data-seed="Specter" style="padding: 10px; flex: 1;">Specter</button>
+                                    <button type="button" class="btn btn-outline emblem-btn" data-seed="Titan" style="padding: 10px; flex: 1;">Titan</button>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary btn-glow btn-block" style="padding: 12px;"><i class="fa-solid fa-rocket"></i> Provision Alliance Vector</button>
+                        </form>
+                    </div>
+
+                    <div class="glass-card" style="padding: 30px; border-color: rgba(255, 42, 95, 0.15); align-self: stretch; display: flex; flex-direction: column; justify-content: center; text-align: center;">
+                        <i class="fa-solid fa-people-group" style="font-size: 3.5rem; color: var(--color-accent-pink); margin-bottom: 20px;"></i>
+                        <h3 style="color: #fff;">Interactive Crew Network</h3>
+                        <p style="color: var(--color-text-secondary); font-size: 0.9rem; margin-top: 10px;">
+                            Competitive players receive XP multipliers when queuing inside active team lobbies. Recruit members to unlock high-precision global crew leaderboards.
+                        </p>
+                    </div>
+                </div>
+            `;
+            
+            this.bindEmblemEvents();
+            document.getElementById('team-create-form')?.addEventListener('submit', (e) => this.handleCreateTeam(e));
+        } else {
+            // RENDER TEAM ACTIVE DASHBOARD
+            this.container.innerHTML = `
+                <div style="display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 30px;">
+                    <!-- Roster & Records -->
+                    <div class="glass-card" style="padding: 30px;">
+                        <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 25px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 20px;">
+                            <img src="https://api.dicebear.com/7.x/identicon/svg?seed=${userTeam.logo_seed}" alt="Emblem" style="width: 70px; height: 70px; border-radius: 8px; border: 2px solid var(--color-accent-pink); background: rgba(0,0,0,0.3); padding: 5px;">
+                            <div>
+                                <span class="badge-pill" style="font-size: 0.7rem; background: rgba(255, 42, 95, 0.1); border-color: rgba(255, 42, 95, 0.3); color: var(--color-accent-pink); margin-bottom: 5px; display: inline-block;">TEAM LEVEL 12</span>
+                                <h2 style="color: #fff; font-family: var(--font-heading);">${userTeam.name}</h2>
+                                <p style="color: var(--color-text-muted); font-size: 0.85rem; margin-top: 4px;">${userTeam.description}</p>
+                            </div>
+                        </div>
+
+                        <h3 style="margin-bottom: 15px;">Active Roster Members (${members.length})</h3>
+                        <div style="display: flex; flex-direction: column; gap: 15px;">
+                            ${members.map(m => `
+                                <div class="friend-item glass-card" style="padding: 12px 15px; border-color: rgba(255,255,255,0.03);">
+                                    <div class="friend-meta">
+                                        <img src="${m.avatar}" alt="Avatar" class="friend-avatar" style="width: 35px; height: 35px;">
+                                        <div>
+                                            <span class="friend-name">${m.username}</span>
+                                            <span class="friend-game" style="color: var(--color-accent-purple); font-weight: 700;">${m.role}</span>
+                                        </div>
+                                    </div>
+                                    <div style="text-align: right;">
+                                        <span style="font-size: 0.85rem; color: #fff; display: block; font-weight: 800;">${m.wins} Wins</span>
+                                        <span style="font-size: 0.75rem; color: var(--color-text-muted);">K/D Ratio: ${m.kd}</span>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <!-- Invitation panel & options -->
+                    <div style="display: flex; flex-direction: column; gap: 30px;">
+                        <div class="glass-card" style="padding: 25px;">
+                            <h3>Recruit New Pilots</h3>
+                            <p style="color: var(--color-text-muted); font-size: 0.8rem; margin-top: 5px; margin-bottom: 20px;">Transmit a team invite payload directly to players.</p>
+                            
+                            <form id="team-invite-form" style="display: flex; gap: 10px;">
+                                <input type="text" id="team-invite-username" placeholder="Target Alias..." required style="flex: 1; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); padding: 10px; border-radius: 6px; color: #fff;">
+                                <button type="submit" class="btn btn-primary btn-glow" style="padding: 10px 15px;">Invite</button>
+                            </form>
+                        </div>
+
+                        <!-- Team Statistics Tracker -->
+                        <div class="glass-card" style="padding: 25px;">
+                            <h3>Squad Arena History</h3>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
+                                <div class="glass-card" style="padding: 15px; text-align: center; border-color: rgba(255,255,255,0.02);">
+                                    <h4 style="font-size: 1.5rem; color: #10b981;">${userTeam.wins || 18}</h4>
+                                    <span style="font-size: 0.75rem; color: var(--color-text-muted);">Arena Wins</span>
+                                </div>
+                                <div class="glass-card" style="padding: 15px; text-align: center; border-color: rgba(255,255,255,0.02);">
+                                    <h4 style="font-size: 1.5rem; color: #ef4444;">${userTeam.losses || 6}</h4>
+                                    <span style="font-size: 0.75rem; color: var(--color-text-muted);">Arena Defeats</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('team-invite-form')?.addEventListener('submit', (e) => this.handleInvitePlayer(e));
+        }
+    }
+
+    bindEmblemEvents() {
+        const btns = document.querySelectorAll('.emblem-btn');
+        btns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                btns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                playCyberBeep(700, 0.05);
+            });
+        });
+    }
+
+    async handleCreateTeam(e) {
+        e.preventDefault();
+        const name = document.getElementById('team-tag-name').value.trim();
+        const desc = document.getElementById('team-desc').value.trim();
+        const logo = document.querySelector('.emblem-btn.active')?.getAttribute('data-seed') || 'Viper';
+
+        triggerToast("Deploying alliance tags to global index...", "info");
+        playCyberBeep(600, 0.15);
+
+        try {
+            if (dbState.isConnected && dbState.client) {
+                // Create row in teams
+                const { data: team, error: tErr } = await dbState.client
+                    .from('teams')
+                    .insert({
+                        name,
+                        logo_seed: logo,
+                        description: desc,
+                        created_by: state.currentUser.id
+                    })
+                    .select()
+                    .single();
+                    
+                if (tErr) throw tErr;
+                
+                // Add leader to team_members
+                const { error: memErr } = await dbState.client
+                    .from('team_members')
+                    .insert({
+                        team_id: team.id,
+                        profile_id: state.currentUser.id,
+                        role: 'Leader'
+                    });
+                if (memErr) throw memErr;
+            } else {
+                state.myTeam = {
+                    id: 'mock-team-uuid',
+                    name,
+                    logo_seed: logo,
+                    description: desc,
+                    wins: 0,
+                    losses: 0
+                };
+            }
+            
+            triggerToast(`ALLIANCE ${name} HAS BEEN PROVISIONED! Ready Up!`, "success");
+            playCyberBeep(850, 0.2);
+            this.refresh();
+        } catch (err) {
+            console.error("Team provisioning failed:", err);
+            triggerToast(`Alliance Provision Rejected: ${err.message || err}`, "danger");
+        }
+    }
+
+    async handleInvitePlayer(e) {
+        e.preventDefault();
+        const username = document.getElementById('team-invite-username').value.trim();
+        triggerToast(`Transmitting squad recruiting invitation to ${username}...`, "info");
+        
+        try {
+            // Simulate recruitment
+            setTimeout(() => {
+                triggerToast(`Recruitment invitation dispatched successfully to ${username}!`, "success");
+                document.getElementById('team-invite-username').value = "";
+                playCyberBeep(800, 0.1);
+            }, 800);
+        } catch (err) {
+            triggerToast("Invite transmission failed.", "danger");
+        }
+    }
+}
+
+// --------------------------------------------------------------------------
+// 14.4 DISCUSSION FORUMS & COMM-CHATS ( REAL-TIME FEEDING )
+// --------------------------------------------------------------------------
+class CommunityManager {
+    constructor() {
+        this.forumContainer = document.getElementById('forum-posts-feed-container');
+        this.chatContainer = document.getElementById('chat-messages-container');
+        this.chatToggles = document.querySelectorAll('.chat-tab-btn');
+        this.chatForm = document.getElementById('chat-input-form');
+        this.forumPostForm = document.getElementById('forum-post-form');
+        this.createPostToggle = document.getElementById('create-post-toggle');
+        this.createPostBox = document.getElementById('forum-create-post-box');
+        this.cancelForumBtn = document.getElementById('forum-cancel-btn');
+        
+        this.bindEvents();
+        this.refresh();
+        this.setupRealtimeChat();
+    }
+
+    bindEvents() {
+        this.chatToggles.forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.chatToggles.forEach(t => t.classList.remove('active'));
+                btn.classList.add('active');
+                state.activeChatRoom = btn.getAttribute('data-chat-tab');
+                this.renderChatMessages();
+                playCyberBeep(650, 0.05);
+            });
+        });
+
+        this.chatForm?.addEventListener('submit', (e) => this.handleSendMessage(e));
+        
+        this.createPostToggle?.addEventListener('click', () => {
+            this.createPostBox.style.display = this.createPostBox.style.display === 'none' ? 'block' : 'none';
+        });
+        
+        this.cancelForumBtn?.addEventListener('click', () => {
+            this.createPostBox.style.display = 'none';
+        });
+
+        this.forumPostForm?.addEventListener('submit', (e) => this.handleCreateForumPost(e));
+    }
+
+    async refresh() {
+        this.renderForums();
+        this.renderChatMessages();
+    }
+
+    async renderForums() {
+        if (!this.forumContainer) return;
+        
+        this.forumContainer.innerHTML = `<div class="spinner" style="margin: 30px auto;"></div>`;
+        
+        let postsList = [...NEWS_DATA.filter(n => n.type === 'forum' || n.type === 'news')];
+        
+        if (dbState.isConnected && dbState.client) {
+            try {
+                // Fetch forum posts and patch releases
+                const { data } = await dbState.client.from('news').select('*').order('created_at', { ascending: false });
+                if (data && data.length > 0) {
+                    postsList = data.map(n => ({
+                        id: n.id,
+                        type: n.type,
+                        badgeClass: n.badge_class || 'bg-purple',
+                        badgeText: n.badge_text || 'FORUM',
+                        date: n.date || new Date(n.created_at).toLocaleDateString(),
+                        readTime: n.read_time || '2 min',
+                        title: n.title,
+                        excerpt: n.excerpt,
+                        content: n.content,
+                        image: n.image,
+                        likes: n.likes
+                    }));
+                }
+            } catch (err) {
+                console.error("Failed to query forums:", err);
+            }
+        }
+        
+        if (postsList.length === 0) {
+            this.forumContainer.innerHTML = `<p style="color: var(--color-text-muted); text-align: center; padding: 20px;">No transmissions deployed to the comm-board yet.</p>`;
+            return;
+        }
+
+        this.forumContainer.innerHTML = postsList.map(p => `
+            <div class="news-card glass-card" style="padding: 20px; margin-bottom: 20px; border-color: rgba(255,255,255,0.03);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <span class="badge-pill ${p.badgeClass}">${p.badgeText}</span>
+                    <span style="font-size: 0.8rem; color: var(--color-text-muted);">${p.date}</span>
+                </div>
+                <h3 style="margin-bottom: 8px; color: #fff; font-family: var(--font-heading);">${p.title}</h3>
+                <p style="color: var(--color-text-secondary); font-size: 0.9rem; margin-bottom: 15px;">${p.excerpt || p.content}</p>
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.03); padding-top: 12px; font-size: 0.85rem;">
+                    <button class="btn btn-outline" style="padding: 6px 12px; border-color: transparent; font-size: 0.8rem;" onclick="window.communityManager.upvotePost('${p.id}')">
+                        <i class="fa-solid fa-heart" style="color: var(--color-accent-pink); margin-right: 5px;"></i> ${p.likes} Likes
+                    </button>
+                    <button class="btn btn-outline" style="padding: 6px 12px; border-color: transparent; font-size: 0.8rem;" onclick="window.communityManager.toggleCommentsDrawer('${p.id}')">
+                        <i class="fa-solid fa-comments" style="color: var(--color-accent-purple); margin-right: 5px;"></i> View Comments
+                    </button>
+                </div>
+                
+                <!-- Slide comments feed -->
+                <div id="comments-box-${p.id}" style="display: none; margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 15px;">
+                    <div style="display: flex; flex-direction: column; gap: 10px;" id="comments-list-${p.id}">
+                        <!-- Loaded dynamically -->
+                    </div>
+                    <form id="comment-form-${p.id}" style="display: flex; gap: 10px; margin-top: 12px;" onsubmit="window.communityManager.handleAddComment(event, '${p.id}')">
+                        <input type="text" id="comment-input-${p.id}" placeholder="Append secure feedback payload..." required style="flex: 1; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); padding: 8px 12px; border-radius: 6px; color: #fff; font-size: 0.85rem;">
+                        <button type="submit" class="btn btn-primary btn-glow" style="padding: 8px 15px; font-size: 0.85rem;"><i class="fa-solid fa-paper-plane"></i></button>
+                    </form>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    async upvotePost(postId) {
+        playCyberBeep(900, 0.1);
+        try {
+            if (dbState.isConnected && dbState.client) {
+                // Find existing likes
+                const { data } = await dbState.client.from('news').select('likes').eq('id', postId).single();
+                await dbState.client.from('news').update({ likes: (data?.likes || 0) + 1 }).eq('id', postId);
+            } else {
+                const target = NEWS_DATA.find(n => n.id === postId);
+                if (target) target.likes++;
+            }
+            triggerToast("Secure validation like registered!", "success");
+            this.renderForums();
+        } catch (e) {
+            triggerToast("Like payload transmission rejected.", "danger");
+        }
+    }
+
+    async toggleCommentsDrawer(postId) {
+        const box = document.getElementById(`comments-box-${postId}`);
+        if (!box) return;
+
+        if (box.style.display === 'none') {
+            box.style.display = 'block';
+            this.loadComments(postId);
+        } else {
+            box.style.display = 'none';
+        }
+    }
+
+    async loadComments(postId) {
+        const listContainer = document.getElementById(`comments-list-${postId}`);
+        if (!listContainer) return;
+
+        listContainer.innerHTML = `<span style="font-size: 0.8rem; color: var(--color-text-muted);">Syncing secure comment logs...</span>`;
+        
+        let commentEntries = [];
+        
+        if (dbState.isConnected && dbState.client) {
+            try {
+                const { data } = await dbState.client
+                    .from('blog_comments')
+                    .select('*')
+                    .eq('post_id', postId)
+                    .order('created_at', { ascending: true });
+                if (data) {
+                    commentEntries = data.map(c => ({
+                        name: c.sender_name,
+                        avatar: c.sender_avatar,
+                        comment: c.comment
+                    }));
+                }
+            } catch (err) {
+                console.error("Failed comments query:", err);
+            }
+        } else {
+            // Mock comments
+            commentEntries = [
+                { name: "NeonShadow", avatar: "https://api.dicebear.com/7.x/adventurer/svg?seed=Shadow", comment: "Excellent tactical assessment! Wall-running calibration has been solid." },
+                { name: "ViperX", avatar: "https://api.dicebear.com/7.x/adventurer/svg?seed=Viper", comment: "EMP shield shocks adjustments make a massive difference inside lobbies." }
+            ];
+        }
+
+        if (commentEntries.length === 0) {
+            listContainer.innerHTML = `<p style="font-size: 0.8rem; color: var(--color-text-muted); font-style: italic;">No comments inside this data node.</p>`;
+            return;
+        }
+
+        listContainer.innerHTML = commentEntries.map(c => `
+            <div style="background: rgba(255,255,255,0.02); padding: 10px; border-radius: 6px; display: flex; gap: 10px; align-items: start;">
+                <img src="${c.avatar}" alt="User" style="width: 25px; height: 25px; border-radius: 50%;">
+                <div>
+                    <span style="font-size: 0.8rem; font-weight: 700; color: var(--color-accent-pink); display: block;">${c.name}</span>
+                    <span style="font-size: 0.8rem; color: var(--color-text-secondary);">${c.comment}</span>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    async handleAddComment(e, postId) {
+        e.preventDefault();
+        const input = document.getElementById(`comment-input-${postId}`);
+        if (!input) return;
+
+        const val = input.value.trim();
+        if (!val) return;
+
+        const senderName = state.currentUser ? state.currentUser.username : "Guest Gamer";
+        const senderAvatar = state.currentUser ? state.currentUser.avatar_url : "https://api.dicebear.com/7.x/adventurer/svg?seed=Guest";
+
+        try {
+            if (dbState.isConnected && dbState.client) {
+                const { error } = await dbState.client
+                    .from('blog_comments')
+                    .insert({
+                        post_id: postId,
+                        sender_name: senderName,
+                        sender_avatar: senderAvatar,
+                        comment: val
+                    });
+                if (error) throw error;
+            }
+            
+            input.value = "";
+            triggerToast("Comment payload synchronized!", "success");
+            playCyberBeep(750, 0.1);
+            this.loadComments(postId);
+        } catch (e) {
+            triggerToast("Comment transmission rejected.", "danger");
+        }
+    }
+
+    async handleCreateForumPost(e) {
+        e.preventDefault();
+        const title = document.getElementById('forum-post-title').value.trim();
+        const category = document.getElementById('forum-post-category').value;
+        const body = document.getElementById('forum-post-body').value.trim();
+
+        triggerToast("Syncing secure transmission stream...", "info");
+        playCyberBeep(500, 0.15);
+
+        try {
+            if (dbState.isConnected && dbState.client) {
+                const { error } = await dbState.client
+                    .from('news')
+                    .insert({
+                        id: `forum-${Date.now()}`,
+                        type: 'forum',
+                        badge_class: category === 'bugs' ? 'bg-pink' : 'bg-purple',
+                        badge_text: category.toUpperCase(),
+                        title,
+                        excerpt: body.substring(0, 120) + "...",
+                        content: body,
+                        likes: 0
+                    });
+                if (error) throw error;
+            } else {
+                NEWS_DATA.unshift({
+                    id: `forum-${Date.now()}`,
+                    type: 'forum',
+                    badgeClass: category === 'bugs' ? 'bg-pink' : 'bg-purple',
+                    badgeText: category.toUpperCase(),
+                    title,
+                    excerpt: body.substring(0, 120) + "...",
+                    content: body,
+                    date: "Today",
+                    likes: 0
+                });
+            }
+            
+            triggerToast("COMMUNICATION PAYLOAD ONLINE!", "success");
+            playCyberBeep(850, 0.2);
+            this.createPostBox.style.display = 'none';
+            this.forumPostForm.reset();
+            this.renderForums();
+        } catch (e) {
+            triggerToast("Failed to post message.", "danger");
+        }
+    }
+
+    // --- REALTIME CHAT NETWORKS ---
+    setupRealtimeChat() {
+        if (dbState.isConnected && dbState.client) {
+            dbState.client
+                .channel('messages')
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
+                    const msg = payload.new;
+                    if (msg.room === state.activeChatRoom) {
+                        this.appendSingleChatMessage(msg);
+                        playCyberBeep(950, 0.04);
+                    }
+                })
+                .subscribe();
+        }
+    }
+
+    async renderChatMessages() {
+        if (!this.chatContainer) return;
+        
+        this.chatContainer.innerHTML = `<span style="font-size: 0.85rem; color: var(--color-text-muted); text-align: center; margin-top: 40px;">Decrypting message arrays...</span>`;
+        
+        let logs = [];
+        
+        if (dbState.isConnected && dbState.client) {
+            try {
+                const { data } = await dbState.client
+                    .from('messages')
+                    .select('*')
+                    .eq('room', state.activeChatRoom)
+                    .order('sent_at', { ascending: true })
+                    .limit(40);
+                if (data) logs = data;
+            } catch (err) {
+                console.error("Chat sync error:", err);
+            }
+        } else {
+            // Mock chat buffers
+            logs = [
+                { id: '1', sender_name: "ViperX", sender_avatar: "https://api.dicebear.com/7.x/adventurer/svg?seed=Viper", message: "Anyone up for ranked tactical queues?" },
+                { id: '2', sender_name: "RageTrigger", sender_avatar: "https://api.dicebear.com/7.x/adventurer/svg?seed=Rage", message: "I'm in! Let's build a squad." },
+                { id: '3', sender_name: "NeonShadow", sender_avatar: "https://api.dicebear.com/7.x/adventurer/svg?seed=Shadow", message: "Calibration patches have been very smooth today." }
+            ];
+        }
+
+        if (logs.length === 0) {
+            this.chatContainer.innerHTML = `
+                <div style="margin: auto; text-align: center; color: var(--color-text-muted); font-size: 0.85rem; padding: 20px;">
+                    <i class="fa-solid fa-lock" style="font-size: 1.5rem; margin-bottom: 10px; color: var(--color-accent-purple);"></i>
+                    <p>Comm channel secure. Send first transmission signal!</p>
+                </div>
+            `;
+            return;
+        }
+
+        this.chatContainer.innerHTML = logs.map(m => this.createChatMessageHTML(m)).join('');
+        this.scrollChatToBottom();
+    }
+
+    createChatMessageHTML(m) {
+        return `
+            <div style="display: flex; gap: 10px; align-items: start;">
+                <img src="${m.sender_avatar || 'https://api.dicebear.com/7.x/adventurer/svg?seed=Guest'}" alt="Avatar" style="width: 32px; height: 32px; border-radius: 50%;">
+                <div style="background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 8px; flex: 1;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <span style="font-size: 0.8rem; font-weight: 800; color: var(--color-accent-pink);">${m.sender_name}</span>
+                        <span style="font-size: 0.65rem; color: var(--color-text-muted);">Secure stream</span>
+                    </div>
+                    <p style="font-size: 0.85rem; color: var(--color-text-secondary);">${m.message}</p>
+                </div>
+            </div>
+        `;
+    }
+
+    appendSingleChatMessage(msg) {
+        const div = document.createElement('div');
+        div.innerHTML = this.createChatMessageHTML(msg);
+        this.chatContainer.appendChild(div.firstElementChild);
+        this.scrollChatToBottom();
+    }
+
+    scrollChatToBottom() {
+        setTimeout(() => {
+            this.chatContainer.scrollTop = this.chatContainer.scrollHeight;
+        }, 100);
+    }
+
+    async handleSendMessage(e) {
+        e.preventDefault();
+        const input = document.getElementById('chat-msg-payload');
+        if (!input) return;
+
+        const val = input.value.trim();
+        if (!val) return;
+
+        const senderName = state.currentUser ? state.currentUser.username : "Guest Gamer";
+        const senderAvatar = state.currentUser ? state.currentUser.avatar_url : "https://api.dicebear.com/7.x/adventurer/svg?seed=Guest";
+
+        try {
+            if (dbState.isConnected && dbState.client) {
+                const { error } = await dbState.client
+                    .from('messages')
+                    .insert({
+                        room: state.activeChatRoom,
+                        sender_id: state.currentUser ? state.currentUser.id : null,
+                        sender_name: senderName,
+                        sender_avatar: senderAvatar,
+                        message: val
+                    });
+                if (error) throw error;
+            } else {
+                // Mock message append directly for offline zero-crash feel
+                this.appendSingleChatMessage({
+                    sender_name: senderName,
+                    sender_avatar: senderAvatar,
+                    message: val
+                });
+                playCyberBeep(950, 0.04);
+            }
+            
+            input.value = "";
+        } catch (e) {
+            triggerToast("Secure message payload transmission failed.", "danger");
+        }
+    }
+}
+
+// --------------------------------------------------------------------------
+// 14.5 PREMIUM STORE & ACHIEVEMENTS PROGRESSION
+// --------------------------------------------------------------------------
+class StoreManager {
+    constructor() {
+        this.balanceEl = document.getElementById('store-user-balance');
+        this.assetsGrid = document.getElementById('store-assets-grid');
+        this.badgesContainer = document.getElementById('profile-badges-container');
+        this.buyPremiumBtn = document.getElementById('buy-premium-plan-btn');
+        
+        this.items = [
+            { id: 'mult', title: "2x XP Multiplier Boost", cost: 150, icon: "fa-bolt", desc: "Unlock double progression multipliers." },
+            { id: 'gold', title: "Golden Weapon Skins", cost: 350, icon: "fa-gun", desc: "Equip premium golden models." },
+            { id: 'pass', title: "Arena Champion League Pass", cost: 200, icon: "fa-ticket", desc: "Secure slots to VIP esports cups." },
+            { id: 'crad', title: "Cyber-Vortex Frame Design", cost: 100, icon: "fa-crop", desc: "Showcase glowing profile aesthetics." }
+        ];
+
+        this.bindEvents();
+        this.refresh();
+    }
+
+    bindEvents() {
+        this.buyPremiumBtn?.addEventListener('click', () => this.handleUpgradeAccount());
+    }
+
+    refresh() {
+        if (this.balanceEl) {
+            this.balanceEl.textContent = `${state.gamerCredits} CR`;
+        }
+        this.renderAssetsGrid();
+        this.renderBadges();
+    }
+
+    renderAssetsGrid() {
+        if (!this.assetsGrid) return;
+        
+        this.assetsGrid.innerHTML = this.items.map(item => `
+            <div class="glass-card" style="padding: 15px; border-color: rgba(255,255,255,0.02); display: flex; flex-direction: column; justify-content: space-between;">
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <i class="fa-solid ${item.icon}" style="font-size: 1.2rem; color: var(--color-accent-pink);"></i>
+                        <span style="font-weight: 800; font-size: 0.95rem; color: var(--color-accent-amber);">${item.cost} CR</span>
+                    </div>
+                    <h4 style="color: #fff; font-size: 0.85rem; margin-bottom: 5px;">${item.title}</h4>
+                    <p style="color: var(--color-text-muted); font-size: 0.75rem;">${item.desc}</p>
+                </div>
+                <button class="btn btn-primary" style="padding: 8px; font-size: 0.8rem; margin-top: 15px; width: 100%;" onclick="window.storeManager.buyItem('${item.id}', ${item.cost}, '${item.title.replace(/'/g, "\\'")}')">Purchase Asset</button>
+            </div>
+        `).join('');
+    }
+
+    async buyItem(itemId, cost, title) {
+        if (state.gamerCredits < cost) {
+            triggerToast("Insufficient credits inside gaming vault!", "warning");
+            playCyberBeep(200, 0.25, 'sawtooth');
+            return;
+        }
+
+        state.gamerCredits -= cost;
+        localStorage.setItem('vortexCredits', state.gamerCredits);
+        playCyberBeep(880, 0.2);
+        
+        // Add unlocked badge to achievement stream
+        try {
+            if (dbState.isConnected && dbState.client && state.currentUser) {
+                await dbState.client
+                    .from('achievements')
+                    .insert({
+                        profile_id: state.currentUser.id,
+                        badge_seed: itemId,
+                        title: `Store Unlock: ${title}`
+                    });
+                
+                await dbState.client.from('profiles').update({ credits: state.gamerCredits }).eq('id', state.currentUser.id);
+            }
+        } catch (e) {
+            console.error("Store sync error:", e);
+        }
+
+        triggerToast(`PROCURING ASSET COMPLETED: ${title}`, "success");
+        this.refresh();
+    }
+
+    renderBadges() {
+        if (!this.badgesContainer) return;
+        
+        this.badgesContainer.innerHTML = `
+            <span class="badge-pill" style="background: rgba(255, 42, 95, 0.1); border-color: var(--color-accent-pink); color: var(--color-accent-pink);"><i class="fa-solid fa-medal"></i> Arena Vanguard</span>
+            <span class="badge-pill" style="background: rgba(139, 92, 246, 0.1); border-color: var(--color-accent-purple); color: var(--color-accent-purple);"><i class="fa-solid fa-trophy"></i> Elite Operator</span>
+            <span class="badge-pill" style="background: rgba(245, 158, 11, 0.1); border-color: var(--color-accent-amber); color: var(--color-accent-amber);"><i class="fa-solid fa-crown"></i> Founder 2026</span>
+        `;
+    }
+
+    async handleUpgradeAccount() {
+        if (!state.currentUser) {
+            triggerToast("Unidentified Gamer Security ID! Secure authentications first.", "warning");
+            window.authManager.show();
+            return;
+        }
+
+        triggerToast("Link payment verification array initialized...", "info");
+        playCyberBeep(500, 0.1);
+
+        setTimeout(async () => {
+            state.currentUser.role = 'Admin'; // Upgrade user locally
+            state.currentUser.wins += 50; // Give credits
+            state.gamerCredits += 1000;
+            localStorage.setItem('vortexCredits', state.gamerCredits);
+
+            try {
+                if (dbState.isConnected && dbState.client) {
+                    await dbState.client
+                        .from('profiles')
+                        .update({ role: 'Admin', credits: state.gamerCredits })
+                        .eq('id', state.currentUser.id);
+                }
+            } catch (e) {
+                console.error("Failed to sync upgraded state:", e);
+            }
+
+            triggerToast("MEMBERSHIP LEVEL ELEVATED TO ELITE GRANDMASTER! Custom Admin security channels activated.", "success");
+            playCyberBeep(980, 0.35);
+            window.authManager.syncUserSessionUI();
+            this.refresh();
+        }, 1200);
+    }
+}
+
+// --------------------------------------------------------------------------
+// 14.6 CENTRAL SECURITY & ADMIN MODERATION CONTROL CENTER
+// --------------------------------------------------------------------------
+class AdminManager {
+    constructor() {
+        this.usersListContainer = document.getElementById('admin-users-list');
+        this.bracketForm = document.getElementById('admin-bracket-form');
+        this.targetSelector = document.getElementById('admin-select-t');
+        
+        this.bindEvents();
+        this.refresh();
+    }
+
+    bindEvents() {
+        this.bracketForm?.addEventListener('submit', (e) => this.handleUpdateBracketWinner(e));
+    }
+
+    async refresh() {
+        if (!state.currentUser || state.currentUser.role !== 'Admin') return;
+        this.renderUserModeration();
+        this.populateTournamentSelector();
+        this.renderAnalyticsCounters();
+    }
+
+    async renderUserModeration() {
+        if (!this.usersListContainer) return;
+        
+        this.usersListContainer.innerHTML = `<span style="font-size: 0.8rem; color: var(--color-text-muted);">Decrypting gamer records...</span>`;
+        
+        let users = [];
+        
+        if (dbState.isConnected && dbState.client) {
+            try {
+                const { data } = await dbState.client.from('profiles').select('*').limit(6);
+                if (data) users = data;
+            } catch (e) {
+                console.error(e);
+            }
+        } else {
+            // Mock profiles list
+            users = [
+                { id: '1', username: "ViperX", role: "Gamer", status: "Active" },
+                { id: '2', username: "NeonShadow", role: "Moderator", status: "Active" },
+                { id: '3', username: "CyberDagger", role: "Gamer", status: "Suspended" }
+            ];
+        }
+
+        this.usersListContainer.innerHTML = users.map(u => `
+            <div class="glass-card" style="padding: 12px; display: flex; justify-content: space-between; align-items: center; border-color: rgba(255,255,255,0.02);">
+                <div>
+                    <span style="color: #fff; font-weight: 700; font-size: 0.85rem;">${u.username}</span>
+                    <span style="font-size: 0.75rem; color: var(--color-text-muted); display: block;">Rank Sector: ${u.role} | Status: <span style="color: ${u.status === 'Active' ? '#10b981' : '#ef4444'};">${u.status}</span></span>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-outline" style="padding: 5px 10px; font-size: 0.75rem; border-color: rgba(255,255,255,0.1);" onclick="window.adminManager.toggleUserStatus('${u.id}', '${u.status}')">Toggle Ban</button>
+                    <button class="btn btn-primary" style="padding: 5px 10px; font-size: 0.75rem;" onclick="window.adminManager.promoteUserRole('${u.id}', '${u.role}')">Shift Role</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    async toggleUserStatus(userId, currentStatus) {
+        const nextStatus = currentStatus === 'Active' ? 'Suspended' : 'Active';
+        triggerToast(`Syncing user security parameters to ${nextStatus}...`, "info");
+        playCyberBeep(600, 0.1);
+
+        try {
+            if (dbState.isConnected && dbState.client) {
+                await dbState.client.from('profiles').update({ status: nextStatus }).eq('id', userId);
+            }
+            triggerToast(`User security status shift successful! Mode: ${nextStatus}`, "success");
+            this.refresh();
+        } catch (e) {
+            triggerToast("Failed to shift user status.", "danger");
+        }
+    }
+
+    async promoteUserRole(userId, currentRole) {
+        const nextRole = currentRole === 'Admin' ? 'Gamer' : 'Admin';
+        triggerToast(`Promoting account node clearance...`, "info");
+        playCyberBeep(700, 0.1);
+
+        try {
+            if (dbState.isConnected && dbState.client) {
+                await dbState.client.from('profiles').update({ role: nextRole }).eq('id', userId);
+            }
+            triggerToast(`Account permission set to: ${nextRole}`, "success");
+            this.refresh();
+        } catch (e) {
+            triggerToast("Failed to update account authorization clearance.", "danger");
+        }
+    }
+
+    populateTournamentSelector() {
+        if (!this.targetSelector) return;
+        this.targetSelector.innerHTML = COUNTDOWN_TOURNAMENTS.map(t => `<option value="${t.id}">${t.title}</option>`).join('');
+    }
+
+    async renderAnalyticsCounters() {
+        // Counter dynamic selectors
+        const gamersCount = document.getElementById('admin-metric-users');
+        const teamsCount = document.getElementById('admin-metric-teams');
+        const ticketsCount = document.getElementById('admin-metric-tickets');
+
+        if (gamersCount) gamersCount.textContent = "1,842";
+        if (teamsCount) teamsCount.textContent = "84";
+        if (ticketsCount) ticketsCount.textContent = "12";
+    }
+
+    handleUpdateBracketWinner(e) {
+        e.preventDefault();
+        const teamA = document.getElementById('admin-bracket-team-a').value.trim();
+        const scoreA = parseInt(document.getElementById('admin-bracket-score-a').value || '0');
+        const teamB = document.getElementById('admin-bracket-team-b').value.trim();
+        const scoreB = parseInt(document.getElementById('admin-bracket-score-b').value || '0');
+
+        triggerToast("Transmitting championship bracket update...", "info");
+        playCyberBeep(500, 0.1);
+
+        setTimeout(() => {
+            const winner = scoreA > scoreB ? teamA : teamB;
+            triggerToast(`CHAMPIONSHIP BRACKET PROGRESSION VERIFIED: ${winner} advanced!`, "success");
+            playCyberBeep(900, 0.25);
+            this.bracketForm.reset();
+        }, 1000);
+    }
+}
+
+// --------------------------------------------------------------------------
+// 14.7 INITIALIZE MANAGERS SYSTEM HANDOFF
+// --------------------------------------------------------------------------
+window.authManager = new AuthManager();
+window.tournamentManager = new TournamentManager();
+window.teamManager = new TeamManager();
+window.communityManager = new CommunityManager();
+window.storeManager = new StoreManager();
+window.adminManager = new AdminManager();
+
+// Global custom views details triggers
+window.viewTournamentDetails = function(id) {
+    const t = COUNTDOWN_TOURNAMENTS.find(item => item.id === id);
+    if (!t) return;
+    triggerToast(`Tourney: ${t.title} | Pool: ${t.prize} | Matches schedule starting soon. Check Discord Captains room.`, "info");
+    playCyberBeep(700, 0.1);
+};
 
 // ==========================================================================
 // 14. INITIALIZATION HOOK

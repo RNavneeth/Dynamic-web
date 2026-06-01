@@ -108,6 +108,110 @@ CREATE TABLE IF NOT EXISTS contact_submissions (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 9. USER PROFILES TABLE
+CREATE TABLE IF NOT EXISTS public.profiles (
+    id UUID PRIMARY KEY,
+    username TEXT UNIQUE NOT NULL,
+    avatar_url TEXT DEFAULT 'https://api.dicebear.com/7.x/adventurer/svg?seed=Alex',
+    bio TEXT,
+    favorite_games TEXT[] DEFAULT '{}',
+    wins INT DEFAULT 0,
+    losses INT DEFAULT 0,
+    kd_ratio DECIMAL(3,2) DEFAULT 0.00,
+    xp INT DEFAULT 0,
+    credits INT DEFAULT 500,
+    role TEXT DEFAULT 'Gamer', -- 'Admin', 'Moderator', 'Gamer'
+    status TEXT DEFAULT 'Active', -- 'Active', 'Suspended'
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 10. TEAMS TABLE
+CREATE TABLE IF NOT EXISTS public.teams (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT UNIQUE NOT NULL,
+    logo_seed TEXT DEFAULT 'Viper',
+    description TEXT,
+    created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    wins INT DEFAULT 0,
+    losses INT DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 11. TEAM MEMBERS TABLE
+CREATE TABLE IF NOT EXISTS public.team_members (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    team_id UUID REFERENCES public.teams(id) ON DELETE CASCADE,
+    profile_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+    role TEXT DEFAULT 'Member', -- 'Leader', 'Officer', 'Member'
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(team_id, profile_id)
+);
+
+-- 12. FRIEND REQUESTS TABLE
+CREATE TABLE IF NOT EXISTS public.friend_requests (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    sender_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+    receiver_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+    status TEXT DEFAULT 'pending', -- 'pending', 'accepted', 'rejected'
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(sender_id, receiver_id)
+);
+
+-- 13. MATCHES TABLE
+CREATE TABLE IF NOT EXISTS public.matches (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tournament_id TEXT REFERENCES public.tournaments(id) ON DELETE CASCADE,
+    round TEXT DEFAULT 'Quarterfinals', -- 'Quarterfinals', 'Semifinals', 'Finals'
+    team_a TEXT NOT NULL,
+    team_b TEXT NOT NULL,
+    score_a INT DEFAULT 0,
+    score_b INT DEFAULT 0,
+    winner TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 14. MESSAGES TABLE
+CREATE TABLE IF NOT EXISTS public.messages (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    room TEXT DEFAULT 'global', -- 'global', 'squad', 'private'
+    sender_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+    sender_name TEXT NOT NULL,
+    sender_avatar TEXT,
+    message TEXT NOT NULL,
+    receiver_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE, -- for private
+    team_id UUID REFERENCES public.teams(id) ON DELETE CASCADE, -- for squad
+    sent_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 15. NOTIFICATIONS TABLE
+CREATE TABLE IF NOT EXISTS public.notifications (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    profile_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+    type TEXT NOT NULL, -- 'friend_request', 'tournament_update', 'match_reminder'
+    content TEXT NOT NULL,
+    is_read BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 16. BLOG COMMENTS TABLE
+CREATE TABLE IF NOT EXISTS public.blog_comments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    post_id TEXT REFERENCES news(id) ON DELETE CASCADE,
+    sender_name TEXT NOT NULL,
+    sender_avatar TEXT,
+    comment TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 17. ACHIEVEMENTS TABLE
+CREATE TABLE IF NOT EXISTS public.achievements (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    profile_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+    badge_seed TEXT NOT NULL,
+    title TEXT NOT NULL,
+    unlocked_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- ==========================================================================
 -- SEED INITIAL DATA INJECTION
 -- ==========================================================================
@@ -155,8 +259,30 @@ INSERT INTO tournaments (id, title, game, date, prize, total_slots, registered_c
 ('t2', 'Chronicles Draft Series', 'Vortex Arena: Tactics', 'June 22, 2026 15:30:00', '$5,000', 16, 10),
 ('t3', 'Overdrive Drifting Trophy', 'Neon Drift: Overdrive', 'July 01, 2026 20:00:00', '$8,500', 24, 14);
 
+-- Trigger to automatically create a public profile when a user signs up
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, username, avatar_url, bio, xp, credits, role, status)
+  VALUES (
+    new.id,
+    COALESCE(new.raw_user_meta_data->>'username', 'Gamer_' || substring(new.id::text, 1, 8)),
+    COALESCE(new.raw_user_meta_data->>'avatar_url', 'https://api.dicebear.com/7.x/adventurer/svg?seed=' || new.id),
+    'A competitive Vortex operative.',
+    0,
+    500,
+    'Gamer',
+    'Active'
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
 -- Ensure Row Level Security (RLS) is disabled/relaxed for testing convenience, or configure standard policies.
--- By default, Supabase creates tables with RLS disabled unless specified. To ensure seamless reading & writing:
 ALTER TABLE games DISABLE ROW LEVEL SECURITY;
 ALTER TABLE leaderboard DISABLE ROW LEVEL SECURITY;
 ALTER TABLE news DISABLE ROW LEVEL SECURITY;
@@ -165,3 +291,12 @@ ALTER TABLE team DISABLE ROW LEVEL SECURITY;
 ALTER TABLE tournaments DISABLE ROW LEVEL SECURITY;
 ALTER TABLE tournament_registrations DISABLE ROW LEVEL SECURITY;
 ALTER TABLE contact_submissions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.profiles DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.teams DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.team_members DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.friend_requests DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.matches DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.messages DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.notifications DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.blog_comments DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.achievements DISABLE ROW LEVEL SECURITY;
