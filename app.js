@@ -6,7 +6,7 @@
 // 1. APPLICATION DATA RECORDS
 // ==========================================================================
 
-const GAMES_DATA = [
+let GAMES_DATA = [
     {
         id: "shadowfall",
         title: "Shadowfall: Nexus",
@@ -109,7 +109,7 @@ const GAMES_DATA = [
     }
 ];
 
-const LEADERBOARD_DATA = [
+let LEADERBOARD_DATA = [
     { rank: 1, name: "ViperX", tag: "@viper", wins: 382, kd: "3.42", score: 98450, level: 88, avatar: "https://api.dicebear.com/7.x/adventurer/svg?seed=Viper" },
     { rank: 2, name: "NeonShadow", tag: "@shadow", wins: 314, kd: "2.98", score: 85210, level: 76, avatar: "https://api.dicebear.com/7.x/adventurer/svg?seed=Shadow" },
     { rank: 3, name: "AetherKnight", tag: "@aether", wins: 295, kd: "2.81", score: 81040, level: 71, avatar: "https://api.dicebear.com/7.x/adventurer/svg?seed=Aether" },
@@ -117,7 +117,7 @@ const LEADERBOARD_DATA = [
     { rank: 5, name: "GlitchMage", tag: "@glitch", wins: 245, kd: "2.41", score: 68900, level: 64, avatar: "https://api.dicebear.com/7.x/adventurer/svg?seed=Glitch" }
 ];
 
-const NEWS_DATA = [
+let NEWS_DATA = [
     {
         id: "news-1",
         type: "news",
@@ -159,7 +159,7 @@ const NEWS_DATA = [
     }
 ];
 
-const PATCH_ACCORDION_DATA = [
+let PATCH_ACCORDION_DATA = [
     {
         version: "v2.4.1 (Active)",
         game: "Shadowfall: Nexus",
@@ -195,14 +195,14 @@ const PATCH_ACCORDION_DATA = [
     }
 ];
 
-const TEAM_DATA = [
+let TEAM_DATA = [
     { name: "Marcus Vance", role: "CEO & Game Architect", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=Marcus", twitter: "#", discord: "#" },
     { name: "Dr. Elena Rostova", role: "Lead Core Networking Tech", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=Elena", twitter: "#", discord: "#" },
     { name: "Kaito Tanaka", role: "Principal Visual Designer", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=Kaito", twitter: "#", discord: "#" },
     { name: "Sarah 'Valkyrie' Stone", role: "Director of Esports Leagues", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=Sarah", twitter: "#", discord: "#" }
 ];
 
-const COUNTDOWN_TOURNAMENTS = [
+let COUNTDOWN_TOURNAMENTS = [
     { id: "t1", title: "Nebula Arena Cup", game: "Shadowfall: Nexus", date: "June 15, 2026 18:00:00", prize: "$10,000", totalSlots: 32, registeredCount: 26 },
     { id: "t2", title: "Chronicles Draft Series", game: "Vortex Arena: Tactics", date: "June 22, 2026 15:30:00", prize: "$5,000", totalSlots: 16, registeredCount: 10 },
     { id: "t3", title: "Overdrive Drifting Trophy", game: "Neon Drift: Overdrive", date: "July 01, 2026 20:00:00", prize: "$8,500", totalSlots: 24, registeredCount: 14 }
@@ -256,6 +256,188 @@ function saveStateToLocalStorage() {
     localStorage.setItem('registeredTournaments', JSON.stringify(state.registeredTournaments));
     localStorage.setItem('notifications', JSON.stringify(state.notifications));
     localStorage.setItem('userProfile', JSON.stringify(state.userProfile));
+}
+
+// ==========================================================================
+// SUPABASE BACKEND SYNCHRONIZATION ENGINE
+// ==========================================================================
+
+const dbState = {
+    url: localStorage.getItem('supabaseUrl') || "https://cdwulwcfuhzffkxymzrw.supabase.co",
+    anonKey: localStorage.getItem('supabaseAnonKey') || "sb_publishable_v7_xF6_z_34OqFn16aw08w_NEwOyPV3",
+    client: null,
+    isConnected: false
+};
+
+// Initialize Supabase Client
+function initSupabase() {
+    if (dbState.url && dbState.anonKey && typeof supabase !== 'undefined') {
+        try {
+            dbState.client = supabase.createClient(dbState.url, dbState.anonKey);
+            dbState.isConnected = true;
+            updateDBStatusUI(true);
+            return true;
+        } catch (e) {
+            console.error("Supabase initialization error:", e);
+            dbState.client = null;
+            dbState.isConnected = false;
+            updateDBStatusUI(false);
+            return false;
+        }
+    } else {
+        dbState.client = null;
+        dbState.isConnected = false;
+        updateDBStatusUI(false);
+        return false;
+    }
+}
+
+// Update DB UI Elements
+function updateDBStatusUI(online) {
+    const statusBadge = document.getElementById('db-status-badge');
+    const modalDot = document.getElementById('db-modal-status-dot');
+    const modalText = document.getElementById('db-modal-status-text');
+    const statusBox = document.getElementById('db-connection-status-box');
+    const disconnectBtn = document.getElementById('db-disconnect-btn');
+
+    if (online) {
+        if (statusBadge) statusBadge.style.backgroundColor = '#10b981';
+        if (modalDot) {
+            modalDot.style.backgroundColor = '#10b981';
+            modalDot.className = 'status-dot online';
+        }
+        if (modalText) modalText.textContent = "Database Connected & Synchronized in Real-Time!";
+        if (statusBox) {
+            statusBox.className = "db-status-box online";
+        }
+        if (disconnectBtn) disconnectBtn.style.display = 'block';
+    } else {
+        if (statusBadge) statusBadge.style.backgroundColor = 'var(--color-accent-amber)';
+        if (modalDot) {
+            modalDot.style.backgroundColor = 'var(--color-accent-amber)';
+            modalDot.className = 'status-dot offline';
+        }
+        if (modalText) modalText.textContent = "Database Sync Offline (Using High-Fidelity Fallback Data)";
+        if (statusBox) {
+            statusBox.className = "db-status-box offline";
+        }
+        if (disconnectBtn) disconnectBtn.style.display = 'none';
+    }
+}
+
+// Async Sync Loader
+async function syncDatabaseData() {
+    if (!dbState.isConnected || !dbState.client) return;
+
+    try {
+        // 1. Sync Games Catalogue
+        const { data: games, error: gamesErr } = await dbState.client.from('games').select('*');
+        if (!gamesErr && games && games.length > 0) {
+            GAMES_DATA = games.map(g => ({
+                id: g.id,
+                title: g.title,
+                tagline: g.tagline,
+                genre: g.genre,
+                excerpt: g.excerpt,
+                fullDesc: g.full_desc,
+                players: g.players,
+                gpu: g.gpu,
+                disk: g.disk,
+                platform: g.platform,
+                images: g.images,
+                features: g.features,
+                downloadUrl: g.download_url,
+                isSpotlight: g.is_spotlight
+            }));
+        }
+
+        // 2. Sync Leaderboard
+        const { data: leaderboard, error: lbErr } = await dbState.client.from('leaderboard').select('*');
+        if (!lbErr && leaderboard && leaderboard.length > 0) {
+            LEADERBOARD_DATA = leaderboard.map(l => ({
+                rank: l.rank,
+                name: l.name,
+                tag: l.tag,
+                wins: l.wins,
+                kd: l.kd,
+                score: l.score,
+                level: l.level,
+                avatar: l.avatar
+            }));
+        }
+
+        // 3. Sync News & Transmissions
+        const { data: news, error: newsErr } = await dbState.client.from('news').select('*');
+        if (!newsErr && news && news.length > 0) {
+            NEWS_DATA = news.map(n => ({
+                id: n.id,
+                type: n.type,
+                badgeClass: n.badge_class,
+                badgeText: n.badge_text,
+                date: n.date,
+                readTime: n.read_time,
+                title: n.title,
+                excerpt: n.excerpt,
+                content: n.content,
+                image: n.image,
+                likes: n.likes
+            }));
+        }
+
+        // 4. Sync Patch Notes Accordions
+        const { data: patches, error: patchErr } = await dbState.client.from('patch_notes').select('*');
+        if (!patchErr && patches && patches.length > 0) {
+            PATCH_ACCORDION_DATA = patches.map(p => ({
+                version: p.version,
+                game: p.game,
+                date: p.date,
+                fixes: p.fixes
+            }));
+        }
+
+        // 5. Sync Team Members
+        const { data: team, error: teamErr } = await dbState.client.from('team').select('*');
+        if (!teamErr && team && team.length > 0) {
+            TEAM_DATA = team.map(t => ({
+                name: t.name,
+                role: t.role,
+                avatar: t.avatar,
+                twitter: t.twitter,
+                discord: t.discord
+            }));
+        }
+
+        // 6. Sync Tournaments Schedules
+        const { data: tournaments, error: tErr } = await dbState.client.from('tournaments').select('*');
+        if (!tErr && tournaments && tournaments.length > 0) {
+            COUNTDOWN_TOURNAMENTS = tournaments.map(t => ({
+                id: t.id,
+                title: t.title,
+                game: t.game,
+                date: t.date,
+                prize: t.prize,
+                totalSlots: t.total_slots,
+                registeredCount: t.registered_count
+            }));
+        }
+
+        // Re-render UI components with freshly synced Supabase data
+        reRenderAllComponents();
+        console.log("Supabase core datasets synchronized successfully.");
+    } catch (e) {
+        console.error("Database synchronization failed:", e);
+    }
+}
+
+function reRenderAllComponents() {
+    renderSpotlightSection();
+    renderLeaderboards();
+    renderCompactTournaments();
+    renderHomeNews();
+    renderGamesLibrary();
+    renderBlogPosts();
+    renderPatchAccordion();
+    renderTeamMembers();
 }
 
 // ==========================================================================
@@ -862,18 +1044,40 @@ function renderHomeNews() {
     }).join('');
 }
 
-window.toggleLikePost = function(id) {
+window.toggleLikePost = async function(id) {
     const idx = state.likedPosts.indexOf(id);
-    if (idx > -1) {
-        state.likedPosts.splice(idx, 1);
-        triggerToast("Article unliked", "info");
-    } else {
-        state.likedPosts.push(id);
-        triggerToast("Article liked!", "success");
+    const n = NEWS_DATA.find(x => x.id === id);
+    if (!n) return;
+
+    const liked = idx > -1;
+    const incrementValue = liked ? -1 : 1;
+
+    try {
+        if (dbState.isConnected && dbState.client) {
+            const { error: likeErr } = await dbState.client.from('news').update({
+                likes: Math.max(0, n.likes + incrementValue)
+            }).eq('id', id);
+
+            if (likeErr) throw likeErr;
+        }
+
+        if (liked) {
+            state.likedPosts.splice(idx, 1);
+            n.likes = Math.max(0, n.likes - 1);
+            triggerToast("Article unliked", "info");
+        } else {
+            state.likedPosts.push(id);
+            n.likes += 1;
+            triggerToast("Article liked!", "success");
+        }
+        
+        saveStateToLocalStorage();
+        renderHomeNews();
+        renderBlogPosts();
+    } catch (err) {
+        console.error("Liking post failed:", err);
+        triggerToast(`Like action failed: ${err.message || "Database connection error"}`, "danger");
     }
-    saveStateToLocalStorage();
-    renderHomeNews();
-    renderBlogPosts();
 };
 
 // Games Library page catalogue renderer
@@ -1083,11 +1287,12 @@ window.openTournamentModal = function(id) {
     document.getElementById('tournament-modal').classList.add('active');
 };
 
-document.getElementById('tournament-registration-form')?.addEventListener('submit', function(e) {
+document.getElementById('tournament-registration-form')?.addEventListener('submit', async function(e) {
     e.preventDefault();
     const id = document.getElementById('t-modal-id').value;
     const roster = document.getElementById('t-roster-name').value;
     const discord = document.getElementById('t-captain-discord').value;
+    const region = document.getElementById('t-roster-region').value;
 
     if (!roster || !discord) {
         triggerToast("Roster variables are incomplete!", "warning");
@@ -1096,27 +1301,62 @@ document.getElementById('tournament-registration-form')?.addEventListener('submi
 
     const t = COUNTDOWN_TOURNAMENTS.find(x => x.id === id);
     if (t) {
-        t.registeredCount++;
-        state.registeredTournaments.push(t.id);
-        
-        // Dynamic notify item
-        state.notifications.unshift({
-            id: Date.now(),
-            text: `Roster '${roster}' seeded successfully for ${t.title}!`,
-            time: "Just now",
-            unread: true
-        });
+        const submitBtn = document.getElementById('tournament-submit-btn');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = "<i class='fa-solid fa-circle-notch fa-spin'></i> Sealing Slot...";
+        }
 
-        saveStateToLocalStorage();
-        triggerToast("Seeding request authorized! Slot sealed.", "success");
-        
-        // Re-render
-        renderCompactTournaments();
-        renderNotifications();
-        
-        // Close modal
-        document.getElementById('tournament-modal').classList.remove('active');
-        this.reset();
+        try {
+            if (dbState.isConnected && dbState.client) {
+                // Insert into registrations
+                const { error: regErr } = await dbState.client.from('tournament_registrations').insert([{
+                    tournament_id: id,
+                    team_name: roster,
+                    captain_discord: discord,
+                    region: region
+                }]);
+
+                if (regErr) throw regErr;
+
+                // Update tournament count
+                const { error: tErr } = await dbState.client.from('tournaments').update({
+                    registered_count: t.registeredCount + 1
+                }).eq('id', id);
+
+                if (tErr) throw tErr;
+            }
+
+            t.registeredCount++;
+            state.registeredTournaments.push(t.id);
+            
+            // Dynamic notify item
+            state.notifications.unshift({
+                id: Date.now(),
+                text: `Roster '${roster}' seeded successfully for ${t.title}!`,
+                time: "Just now",
+                unread: true
+            });
+
+            saveStateToLocalStorage();
+            triggerToast("Seeding request authorized! Slot sealed.", "success");
+            
+            // Re-render
+            renderCompactTournaments();
+            renderNotifications();
+            
+            // Close modal
+            document.getElementById('tournament-modal').classList.remove('active');
+            this.reset();
+        } catch (err) {
+            console.error("Tournament registration failed:", err);
+            triggerToast(`Registration Failed: ${err.message || "Internal database error"}`, "danger");
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = "Confirm Competitive Seeding Slot";
+            }
+        }
     }
 });
 
@@ -1366,24 +1606,45 @@ contactForm?.addEventListener('submit', function(e) {
     if (btnText) btnText.style.display = 'none';
     if (btnSpinner) btnSpinner.style.display = 'block';
 
-    setTimeout(() => {
-        // Successful response callback simulation
-        if (btn) btn.disabled = false;
-        if (btnText) btnText.style.display = 'inline-flex';
-        if (btnSpinner) btnSpinner.style.display = 'none';
+    setTimeout(async () => {
+        try {
+            if (dbState.isConnected && dbState.client) {
+                const priority = document.getElementById('form-priority').value;
+                const { error: submitErr } = await dbState.client.from('contact_submissions').insert([{
+                    name: name.value.trim(),
+                    email: email.value.trim(),
+                    department: dept.value,
+                    priority: priority,
+                    message: message.value.trim()
+                }]);
 
-        triggerToast("Transmission dispatched! Comm encrypted.", "success");
-        
-        state.notifications.unshift({
-            id: Date.now(),
-            text: `Support ticket regarding '${dept.value}' registered on secure arrays.`,
-            time: "Just now",
-            unread: true
-        });
-        saveStateToLocalStorage();
-        renderNotifications();
+                if (submitErr) throw submitErr;
+            }
 
-        this.reset();
+            // Successful response callback simulation
+            if (btn) btn.disabled = false;
+            if (btnText) btnText.style.display = 'inline-flex';
+            if (btnSpinner) btnSpinner.style.display = 'none';
+
+            triggerToast("Transmission dispatched! Comm encrypted.", "success");
+            
+            state.notifications.unshift({
+                id: Date.now(),
+                text: `Support ticket regarding '${dept.value}' registered on secure arrays.`,
+                time: "Just now",
+                unread: true
+            });
+            saveStateToLocalStorage();
+            renderNotifications();
+
+            contactForm.reset();
+        } catch (err) {
+            console.error("Form transmission failed:", err);
+            triggerToast(`Transmission Failed: ${err.message || "Internal database error"}`, "danger");
+            if (btn) btn.disabled = false;
+            if (btnText) btnText.style.display = 'inline-flex';
+            if (btnSpinner) btnSpinner.style.display = 'none';
+        }
     }, 2000);
 });
 
@@ -1607,29 +1868,178 @@ document.getElementById('spotlight-next')?.addEventListener('click', () => {
 
 
 // ==========================================================================
+// SUPABASE MODAL HANDLERS
+// ==========================================================================
+const dbToggleBtn = document.getElementById('db-config-toggle');
+const dbModal = document.getElementById('db-config-modal');
+const dbModalClose = document.getElementById('db-modal-close');
+const dbConfigForm = document.getElementById('db-config-form');
+const dbTestBtn = document.getElementById('db-test-btn');
+const dbDisconnectBtn = document.getElementById('db-disconnect-btn');
+
+dbToggleBtn?.addEventListener('click', () => {
+    const savedUrl = localStorage.getItem('supabaseUrl') || dbState.url;
+    const savedKey = localStorage.getItem('supabaseAnonKey') || dbState.anonKey;
+    const dbUrlInput = document.getElementById('db-url');
+    const dbKeyInput = document.getElementById('db-anon-key');
+
+    if (dbUrlInput) dbUrlInput.value = savedUrl;
+    if (dbKeyInput) dbKeyInput.value = savedKey;
+
+    updateDBStatusUI(dbState.isConnected);
+    dbModal.classList.add('active');
+});
+
+dbModalClose?.addEventListener('click', () => {
+    dbModal.classList.remove('active');
+});
+
+dbModal?.addEventListener('click', (e) => {
+    if (e.target === dbModal) {
+        dbModal.classList.remove('active');
+    }
+});
+
+dbTestBtn?.addEventListener('click', async () => {
+    const url = document.getElementById('db-url').value.trim();
+    const key = document.getElementById('db-anon-key').value.trim();
+
+    if (!url || !key) {
+        triggerToast("Please input both Project URL and Anon API Key!", "warning");
+        return;
+    }
+
+    dbTestBtn.disabled = true;
+    dbTestBtn.textContent = "Testing...";
+    triggerToast("Initiating testing ping to Supabase...", "info");
+
+    try {
+        const testClient = supabase.createClient(url, key);
+        const { data, error } = await testClient.from('games').select('id').limit(1);
+
+        if (error) throw error;
+
+        triggerToast("VORTEX SERVER LINK ACTIVE! Connection verified.", "success");
+        const statusBox = document.getElementById('db-connection-status-box');
+        const modalText = document.getElementById('db-modal-status-text');
+        const modalDot = document.getElementById('db-modal-status-dot');
+
+        if (statusBox) statusBox.className = "db-status-box online";
+        if (modalDot) {
+            modalDot.style.backgroundColor = '#10b981';
+            modalDot.className = 'status-dot online';
+        }
+        if (modalText) modalText.textContent = "Verification Succeeded! Server responding to queries.";
+    } catch (e) {
+        console.error("Test connection failed:", e);
+        triggerToast(`Verification Failed: ${e.message || "Invalid credentials"}`, "danger");
+        
+        const statusBox = document.getElementById('db-connection-status-box');
+        const modalText = document.getElementById('db-modal-status-text');
+        const modalDot = document.getElementById('db-modal-status-dot');
+
+        if (statusBox) statusBox.className = "db-status-box offline";
+        if (modalDot) {
+            modalDot.style.backgroundColor = '#ef4444';
+            modalDot.className = 'status-dot offline';
+        }
+        if (modalText) modalText.textContent = `Verification Error: ${e.message || "Unauthorized"}`;
+    } finally {
+        dbTestBtn.disabled = false;
+        dbTestBtn.textContent = "Test Link";
+    }
+});
+
+dbConfigForm?.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const url = document.getElementById('db-url').value.trim();
+    const key = document.getElementById('db-anon-key').value.trim();
+
+    if (!url || !key) {
+        triggerToast("Please fill all required inputs!", "warning");
+        return;
+    }
+
+    const saveBtn = document.getElementById('db-save-btn');
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Connecting...";
+
+    try {
+        const client = supabase.createClient(url, key);
+        const { error } = await client.from('games').select('id').limit(1);
+
+        if (error) throw error;
+
+        localStorage.setItem('supabaseUrl', url);
+        localStorage.setItem('supabaseAnonKey', key);
+
+        dbState.url = url;
+        dbState.anonKey = key;
+        dbState.client = client;
+        dbState.isConnected = true;
+
+        triggerToast("Database Sync Activated! Refreshing datasets...", "success");
+        dbModal.classList.remove('active');
+        
+        updateDBStatusUI(true);
+        await syncDatabaseData();
+    } catch (e) {
+        console.error("Database connection failure:", e);
+        triggerToast(`Link failed: ${e.message || "Check credentials"}`, "danger");
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = "Connect Server";
+    }
+});
+
+dbDisconnectBtn?.addEventListener('click', () => {
+    localStorage.removeItem('supabaseUrl');
+    localStorage.removeItem('supabaseAnonKey');
+
+    dbState.url = "";
+    dbState.anonKey = "";
+    dbState.client = null;
+    dbState.isConnected = false;
+
+    triggerToast("Database disconnected. Reverting to fallback records.", "info");
+    dbModal.classList.remove('active');
+    updateDBStatusUI(false);
+    
+    setTimeout(() => {
+        window.location.reload();
+    }, 800);
+});
+
+// ==========================================================================
 // 14. INITIALIZATION HOOK
 // ==========================================================================
 
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
     // 1. Core visual dynamic background init
     new ParticleSystem();
 
     // 2. Navigation routing init
     new Router();
 
-    // 3. Profiles & gamer state synchronization init
+    // 3. Initialize Supabase backend parameters if active
+    initSupabase();
+    if (dbState.isConnected) {
+        await syncDatabaseData();
+    }
+
+    // 4. Profiles & gamer state synchronization init
     syncGamerProfileUI();
     renderFriendsList();
     renderNotifications();
 
-    // 4. Page components renders
+    // 5. Page components renders
     renderSpotlightSection();
     renderLeaderboards();
     renderCompactTourdowns = startTournamentCountdowns();
     renderCompactTournaments();
     renderHomeNews();
 
-    // 5. Secondary screen initializers
+    // 6. Secondary screen initializers
     renderGamesLibrary();
     renderBlogPosts();
     renderPatchAccordion();
