@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vortex Studios | Next-Gen Gaming Universe</title>
+    <!-- Meta Descriptions for SEO -->
+    <meta name="description" content="Welcome to Vortex Studios, the epicenter of next-generation gaming. Explore award-winning multiplayer titles, join global tournaments, climb the leaderboards, and read the latest esports patch notes.">
+    <meta name="keywords" content="gaming startup, multiplayer games, esports tournaments, vortex studios, indie games, gaming leaderboard, gaming blog">
+    <meta name="author" content="Vortex Studios">
+    
+    <!-- Google Fonts (Outfit for headings, Inter for body) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome for Premium Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Core Stylesheet -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Dynamic Particle Canvas for Glowing Cyberpunk Background -->
+    <canvas id="particle-canvas"></canvas>
+
+    <!-- Main Application Container -->
+    <div class="app-container">
+        
+        <!-- ================= SIDEBAR NAVIGATION ================= -->
+        <aside class="app-sidebar" id="app-sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-logo">
+                    <i class="fa-solid fa-square-virus logo-icon"></i>
+                    <span class="brand-text">VORTEX</span>
+                </div>
+                <button class="sidebar-close-btn" id="sidebar-close-btn">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <ul>
+                    <li class="nav-item">
+                        <a href="#home" class="nav-link active" data-route="home">
+                            <i class="fa-solid fa-house nav-icon"></i>
+                            <span class="nav-label">Home</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#games" class="nav-link" data-route="games">
+                            <i class="fa-solid fa-gamepad nav-icon"></i>
+                            <span class="nav-label">Explore Games</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#blog" class="nav-link" data-route="blog">
+                            <i class="fa-solid fa-newspaper nav-icon"></i>
+                            <span class="nav-label">Blog & News</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#about" class="nav-link" data-route="about">
+                            <i class="fa-solid fa-circle-info nav-icon"></i>
+                            <span class="nav-label">About Us</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#contact" class="nav-link" data-route="contact">
+                            <i class="fa-solid fa-envelope nav-icon"></i>
+                            <span class="nav-label">Contact Us</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            
+            <!-- Sidebar Widget: Online Friends -->
+            <div class="sidebar-friends-widget">
+                <div class="widget-header">
+                    <span class="widget-title">ONLINE PLAYERS</span>
+                    <button class="widget-action-btn" title="Add Friend" id="add-friend-btn">
+                        <i class="fa-solid fa-plus"></i>
+                    </button>
+                </div>
+                <div class="friends-list" id="sidebar-friends-list">
+                    <!-- Dynamic Friends Injected Here by JS -->
+                </div>
+            </div>
+            
+            <!-- Sidebar Footer Profile / Action -->
+            <div class="sidebar-footer">
+                <button class="logout-btn" id="logout-btn">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                    <span>System Status</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- ================= MAIN WRAPPER ================= -->
+        <div class="main-wrapper">
+            
+            <!-- ================= TOP NAVIGATION BAR ================= -->
+            <header class="app-header">
+                <div class="header-left">
+                    <button class="sidebar-toggle-btn" id="sidebar-toggle-btn" aria-label="Toggle Sidebar">
+                        <i class="fa-solid fa-bars"></i>
+                    </button>
+                    <!-- Global Interactive Search -->
+                    <div class="header-search-bar">
+                        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                        <input type="text" id="global-search" placeholder="Search games, tournaments, players...">
+                        <div class="search-results-dropdown" id="search-results-dropdown">
+                            <!-- Live search items injected here -->
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="header-right">
+                    <!-- Notifications Dropdown Trigger -->
+                    <div class="header-action-wrapper" id="notifications-wrapper">
+                        <button class="header-action-btn" id="notifications-toggle" aria-label="Notifications">
+                            <i class="fa-solid fa-bell"></i>
+                            <span class="badge-dot pulse" id="notification-badge"></span>
+                        </button>
+                        <div class="notifications-dropdown" id="notifications-dropdown">
+                            <div class="dropdown-header">
+                                <h3>Notifications</h3>
+                                <button id="mark-all-read" class="header-link">Clear All</button>
+                            </div>
+                            <div class="notifications-list" id="notifications-list">
+                                <!-- Dynamic notifications inject here -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Language/Settings Fast Trigger -->
+                    <button class="header-action-btn" id="settings-toggle" title="Settings" aria-label="Settings">
+                        <i class="fa-solid fa-gear"></i>
+                    </button>
+                    
+                    <!-- Dynamic User Account Profile card -->
+                    <div class="header-profile" id="header-profile-card">
+                        <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=Alex" alt="User Profile Picture" class="profile-avatar" id="header-avatar">
+                        <div class="profile-meta">
+                            <span class="profile-name" id="header-username">Alex Ryan</span>
+                            <span class="profile-tag" id="header-tag">@alex.gg</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-down profile-arrow"></i>
+                        
+                        <!-- Account Details Dynamic Tooltip -->
+                        <div class="profile-dropdown" id="profile-dropdown">
+                            <div class="profile-dropdown-card">
+                                <div class="pd-header">
+                                    <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=Alex" alt="Avatar" id="pd-avatar">
+                                    <div>
+                                        <h4 id="pd-username">Alex Ryan</h4>
+                                        <p id="pd-rank">Elite Grandmaster</p>
+                                    </div>
+                                </div>
+                                <div class="pd-stats-grid">
+                                    <div class="pd-stat-box">
+                                        <span class="pd-stat-val" id="pd-wins">143</span>
+                                        <span class="pd-stat-label">Wins</span>
+                                    </div>
+                                    <div class="pd-stat-box">
+                                        <span class="pd-stat-val" id="pd-matches">210</span>
+                                        <span class="pd-stat-label">Matches</span>
+                                    </div>
+                                </div>
+                                <div class="pd-xp-bar">
+                                    <div class="xp-text">
+                                        <span>Level <span id="pd-level">42</span></span>
+                                        <span id="pd-xp-pct">75% XP</span>
+                                    </div>
+                                    <div class="xp-progress">
+                                        <div class="xp-fill" id="pd-xp-fill" style="width: 75%;"></div>
+                                    </div>
+                                </div>
+                                <button class="btn btn-outline btn-block" id="customize-profile-btn">Edit Gamer Profile</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- ================= DYNAMIC PAGE CONTENT CONTAINER ================= -->
+            <main class="content-container">
+                
+                <!-- ================= HOME PAGE SECTION ================= -->
+                <section id="home-page" class="page active">
+                    <!-- Hero Section with Typewriter Effect and Glowing Stats -->
+                    <div class="hero-section">
+                        <div class="hero-overlay"></div>
+                        <div class="hero-content">
+                            <div class="badge-gaming">
+                                <i class="fa-solid fa-fire"></i> THE NEXT FRONTIER OF INTERACTIVE ENTERTAINMENT
+                            </div>
+                            <h1 class="hero-title">WE CRAFT <span id="typewriter-text" class="text-gradient"></span></h1>
+                            <p class="hero-description">Vortex Studios is an independent gaming powerhouse redefining multiplayer experiences. We merge state-of-the-art visuals, ultra-responsive netcode, and storytelling to construct living worlds you will never want to leave.</p>
+                            <div class="hero-actions">
+                                <a href="#games" class="btn btn-primary btn-glow" data-nav="games">
+                                    <i class="fa-solid fa-gamepad"></i> Explore Games
+                                </a>
+                                <a href="#about" class="btn btn-secondary" data-nav="about">
+                                    <i class="fa-solid fa-users"></i> Meet The Crew
+                                </a>
+                            </div>
+                            <!-- Count-up Stats Dashboard -->
+                            <div class="hero-stats">
+                                <div class="stat-card">
+                                    <h3 class="stat-number" data-target="5800000">0</h3>
+                                    <p class="stat-label">Registered Players</p>
+                                </div>
+                                <div class="stat-card">
+                                    <h3 class="stat-number" data-target="4">0</h3>
+                                    <p class="stat-label">Live Games</p>
+                                </div>
+                                <div class="stat-card">
+                                    <h3 class="stat-number" data-target="15">0</h3>
+                                    <p class="stat-label">Active Tournaments</p>
+                                </div>
+                                <div class="stat-card">
+                                    <h3 class="stat-number" data-target="99">99</h3>
+                                    <p class="stat-label">Server Uptime %</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Spotlight Featured Game (Inspired by Spider-Man layout) -->
+                    <div class="section-container">
+                        <div class="section-header">
+                            <div>
+                                <span class="section-subtitle">TODAY'S FEATURED SHOWCASE</span>
+                                <h2 class="section-title">Spotlight Title</h2>
+                            </div>
+                            <div class="carousel-nav-arrows">
+                                <button class="carousel-arrow" id="spotlight-prev" aria-label="Previous Spotlight"><i class="fa-solid fa-chevron-left"></i></button>
+                                <button class="carousel-arrow active" id="spotlight-next" aria-label="Next Spotlight"><i class="fa-solid fa-chevron-right"></i></button>
+                            </div>
+                        </div>
+                        
+                        <div class="spotlight-container" id="spotlight-card">
+                            <!-- Dynamic showcase elements loaded by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Tournaments & Leaderboards Split Layout -->
+                    <div class="home-split-grid">
+                        
+                        <!-- Left Block: Upcoming Tournaments Timeline -->
+                        <div class="home-split-column glass-card">
+                            <div class="column-header">
+                                <div class="header-icon-title">
+                                    <i class="fa-solid fa-trophy column-icon accent-pink"></i>
+                                    <h3>Upcoming Tournaments</h3>
+                                </div>
+                                <span class="badge-pill">Compete & Win</span>
+                            </div>
+                            
+                            <div class="tournament-list-compact" id="home-tournament-list">
+                                <!-- Loaded dynamically via JS with real-time countdown clocks -->
+                            </div>
+                            
+                            <div class="column-footer">
+                                <a href="#blog" class="btn btn-outline btn-block text-center" data-nav="blog">
+                                    View All Announcements
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- Right Block: Dynamic Leaderboard -->
+                        <div class="home-split-column glass-card">
+                            <div class="column-header">
+                                <div class="header-icon-title">
+                                    <i class="fa-solid fa-ranking-star column-icon accent-purple"></i>
+                                    <h3>Popular Players Leaderboard</h3>
+                                </div>
+                                <div class="leaderboard-tabs">
+                                    <button class="lb-tab active" data-lb-stat="wins">Wins</button>
+                                    <button class="lb-tab" data-lb-stat="kd">K/D</button>
+                                    <button class="lb-tab" data-lb-stat="score">Score</button>
+                                </div>
+                            </div>
+                            
+                            <div class="leaderboard-search">
+                                <i class="fa-solid fa-magnifying-glass lb-search-icon"></i>
+                                <input type="text" id="leaderboard-player-search" placeholder="Search leaderboard player...">
+                            </div>
+
+                            <div class="leaderboard-list" id="home-leaderboard-list">
+                                <!-- Injected dynamically by JS -->
+                            </div>
+                            
+                            <div class="column-footer">
+                                <div class="leaderboard-player-status">
+                                    <span class="status-dot online"></span>
+                                    <span>Your Current Rank: <strong>#124 (Top 2%)</strong></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- News & Updates Quick Peek -->
+                    <div class="section-container">
+                        <div class="section-header">
+                            <div>
+                                <span class="section-subtitle">STAY AHEAD OF THE GAME</span>
+                                <h2 class="section-title">Latest News & Patch Updates</h2>
+                            </div>
+                            <a href="#blog" class="btn btn-outline" data-nav="blog">Read More Articles</a>
+                        </div>
+                        <div class="news-grid-compact" id="home-news-grid">
+                            <!-- Injected dynamically by JS -->
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ================= GAMES PAGE SECTION ================= -->
+                <section id="games-page" class="page">
+                    <div class="page-header-banner">
+                        <span class="banner-tag text-gradient">VORTEX CATALOGUE</span>
+                        <h1>Interactive Game Library</h1>
+                        <p>Explore our critically acclaimed gaming portfolio. Filter by genre, discover full feature sets, watch high-fidelity trailers, and download your client directly to start playing.</p>
+                    </div>
+
+                    <!-- Category Filters & Search Controls -->
+                    <div class="library-controls glass-card">
+                        <div class="genre-filters" id="games-genre-filters">
+                            <button class="filter-btn active" data-genre="all">All Genres</button>
+                            <button class="filter-btn" data-genre="Action">Action / Shooters</button>
+                            <button class="filter-btn" data-genre="RPG">Open World RPG</button>
+                            <button class="filter-btn" data-genre="Strategy">Strategy / Cards</button>
+                            <button class="filter-btn" data-genre="Racing">High-Octane Racing</button>
+                        </div>
+                        <div class="library-search">
+                            <i class="fa-solid fa-search"></i>
+                            <input type="text" id="library-search-input" placeholder="Search by name, tags, features...">
+                        </div>
+                    </div>
+
+                    <!-- Games Grid -->
+                    <div class="games-grid" id="games-grid-container">
+                        <!-- Loaded dynamically via JS -->
+                    </div>
+
+                    <!-- Interactive Download Dashboard -->
+                    <div class="download-dashboard glass-card" id="download-dashboard-section">
+                        <div class="dd-left">
+                            <div class="dd-icon-box">
+                                <i class="fa-solid fa-cloud-arrow-down download-icon-glowing"></i>
+                            </div>
+                            <div class="dd-meta">
+                                <h3>Vortex Global Client Launcher</h3>
+                                <p>Manage your updates, patch files, friends list, and boot games seamlessly. Built on high-speed CDN backbones.</p>
+                                <div class="platform-support-icons">
+                                    <i class="fa-brands fa-windows" title="Windows Support"></i>
+                                    <i class="fa-brands fa-apple" title="macOS Support"></i>
+                                    <i class="fa-brands fa-playstation" title="PlayStation 5"></i>
+                                    <i class="fa-brands fa-xbox" title="Xbox Series X/S"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="dd-right">
+                            <button class="btn btn-primary btn-glow" id="client-download-trigger">
+                                <i class="fa-solid fa-download"></i> Download Vortex Launcher (Windows)
+                            </button>
+                            <span class="subtext">v3.4.1 Stable (94.2 MB) | GPG Signed SHA-256</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ================= BLOG & NEWS PAGE SECTION ================= -->
+                <section id="blog-page" class="page">
+                    <div class="page-header-banner">
+                        <span class="banner-tag text-gradient">VORTEX TRANSMISSIONS</span>
+                        <h1>Vortex News, Tournaments & Patch Notes</h1>
+                        <p>Keep your pulse on Vortex game developments, esports leagues, balancing notes, and community highlights.</p>
+                    </div>
+
+                    <!-- Multi-Tab Category Selector (News vs. Patch Notes vs. Tournaments) -->
+                    <div class="blog-tab-container">
+                        <div class="blog-tab-selectors" id="blog-tab-selectors">
+                            <button class="blog-tab-btn active" data-blog-type="all">
+                                <i class="fa-solid fa-list"></i> All Transmissions
+                            </button>
+                            <button class="blog-tab-btn" data-blog-type="news">
+                                <i class="fa-solid fa-newspaper"></i> Gaming News
+                            </button>
+                            <button class="blog-tab-btn" data-blog-type="patch">
+                                <i class="fa-solid fa-clipboard-list"></i> Patch Notes
+                            </button>
+                            <button class="blog-tab-btn" data-blog-type="tournament">
+                                <i class="fa-solid fa-trophy"></i> Tournament Updates
+                            </button>
+                        </div>
+                        <div class="blog-search-wrapper">
+                            <input type="text" id="blog-search-input" placeholder="Search articles or patch notes...">
+                            <i class="fa-solid fa-search"></i>
+                        </div>
+                    </div>
+
+                    <!-- Two Column Layout: Main News Feed vs. Side Accordion Patch History -->
+                    <div class="blog-layout-grid">
+                        
+                        <!-- Main News Feed -->
+                        <div class="blog-main-column" id="blog-posts-feed">
+                            <!-- Injected dynamically by JS -->
+                        </div>
+
+                        <!-- Sidebar Accordion: Detailed Patch History -->
+                        <div class="blog-side-column glass-card">
+                            <div class="sidebar-block-header">
+                                <i class="fa-solid fa-gear accent-purple"></i>
+                                <h3>Deep-Dive Changelogs</h3>
+                            </div>
+                            <p class="sidebar-block-desc">Read exact stat tweaks, weapon updates, and bug fixes straight from the dev logs.</p>
+                            
+                            <div class="patch-accordion" id="patch-notes-accordion">
+                                <!-- Injected dynamically by JS -->
+                            </div>
+                        </div>
+
+                    </div>
+                </section>
+
+                <!-- ================= ABOUT US PAGE SECTION ================= -->
+                <section id="about-page" class="page">
+                    <!-- High-Impact Brand Banner -->
+                    <div class="about-hero glass-card">
+                        <div class="about-hero-grid">
+                            <div class="about-hero-text">
+                                <span class="about-tag">OUR ORIGIN STORY</span>
+                                <h2>Crating Living Universes</h2>
+                                <p>Founded in 2024 by a coalition of industry veterans who grew tired of corporate stagnation, Vortex Studios was established with a singular mission: to make games that value the player's intelligence, time, and imagination.</p>
+                                <p>We don't design products for metrics; we build adrenaline-pumping, tear-jerking, high-precision virtual realities. From our global hub in Austin, Texas, to our distributed crew across 14 countries, we write the future of gaming one frame at a time.</p>
+                            </div>
+                            <div class="about-hero-decor">
+                                <div class="glowing-orb-wrapper">
+                                    <div class="glowing-orb pink"></div>
+                                    <div class="glowing-orb purple"></div>
+                                    <div class="glowing-core">
+                                        <i class="fa-solid fa-code"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Vision & Mission High-Fidelity Grid -->
+                    <div class="section-container">
+                        <div class="section-header text-center">
+                            <span class="section-subtitle">GUIDING PILLARS</span>
+                            <h2 class="section-title">Vision, Mission & Core Values</h2>
+                        </div>
+                        <div class="pillars-grid">
+                            <div class="pillar-card glass-card">
+                                <div class="pillar-icon-box pink">
+                                    <i class="fa-solid fa-eye"></i>
+                                </div>
+                                <h3>Our Vision</h3>
+                                <p>To establish a global gaming ecosystem where community participation and premium technological craftsmanship combine to form legendary universes that endure for generations.</p>
+                            </div>
+                            <div class="pillar-card glass-card">
+                                <div class="pillar-icon-box purple">
+                                    <i class="fa-solid fa-crosshairs"></i>
+                                </div>
+                                <h3>Our Mission</h3>
+                                <p>To engineering incredibly responsive game engines, tell narratives that respect gamer intelligence, and make online infrastructure that ensures flawless matchmaking, minimal ping, and zero latency friction.</p>
+                            </div>
+                            <div class="pillar-card glass-card">
+                                <div class="pillar-icon-box amber">
+                                    <i class="fa-solid fa-handshake-angle"></i>
+                                </div>
+                                <h3>Player-First Pledge</h3>
+                                <p>No predatory pay-to-win microtransactions, no rushed releases, and total development transparency with regular patch logs, playtesting feedback loops, and open communication channels.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Timeline / Milestones Story -->
+                    <div class="section-container">
+                        <div class="section-header text-center">
+                            <span class="section-subtitle">THE CHRONOLOGY</span>
+                            <h2 class="section-title">Milestones on our Orbit</h2>
+                        </div>
+                        
+                        <div class="timeline-container">
+                            <div class="timeline-line"></div>
+                            
+                            <!-- Milestone 1 -->
+                            <div class="timeline-item left glass-card">
+                                <div class="timeline-dot"></div>
+                                <span class="timeline-date">Q1 2024</span>
+                                <h3>The Catalyst</h3>
+                                <p>Vortex Studios formed in a small garage with 6 developers. Secured $2M seed funding backed by gamers who wanted structural industry reform.</p>
+                            </div>
+                            
+                            <!-- Milestone 2 -->
+                            <div class="timeline-item right glass-card">
+                                <div class="timeline-dot"></div>
+                                <span class="timeline-date">Q3 2025</span>
+                                <h3>Nexus Unveiled</h3>
+                                <p>Launched Shadowfall: Nexus in Alpha. Reached 100k concurrent players within 48 hours, highlighting a massive player demand for fast cyberpunk combat.</p>
+                            </div>
+                            
+                            <!-- Milestone 3 -->
+                            <div class="timeline-item left glass-card">
+                                <div class="timeline-dot"></div>
+                                <span class="timeline-date">Q1 2026</span>
+                                <h3>Expansion Vector</h3>
+                                <p>Released Eldoria: Chronicles of Aether to standard praise. Grew staff to 50 developers worldwide and initiated the global Vortex Esports Tournament Series.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Team Members Dynamic Grid -->
+                    <div class="section-container">
+                        <div class="section-header">
+                            <div>
+                                <span class="section-subtitle">THE BRAIN TRUST</span>
+                                <h2 class="section-title">Meet The Creative Pioneers</h2>
+                            </div>
+                            <button class="btn btn-outline" id="join-vortex-btn">We are hiring! Join Us</button>
+                        </div>
+                        <div class="team-grid" id="about-team-grid">
+                            <!-- Injected dynamically by JS -->
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ================= CONTACT US PAGE SECTION ================= -->
+                <section id="contact-page" class="page">
+                    <div class="page-header-banner">
+                        <span class="banner-tag text-gradient">DIRECT COMM-LINK</span>
+                        <h1>Reach Vortex Studios Command</h1>
+                        <p>Have an inquiry, feedback, business proposal, or support ticket? Fire off a transmission below and our comms array will connect you to the right sector.</p>
+                    </div>
+
+                    <div class="contact-layout-grid">
+                        
+                        <!-- Contact Details & Social array -->
+                        <div class="contact-details-column">
+                            <!-- Support / General Mail glass cards -->
+                            <div class="contact-info-card glass-card">
+                                <i class="fa-solid fa-headset cic-icon accent-pink"></i>
+                                <div class="cic-content">
+                                    <h3>Player Support Hub</h3>
+                                    <p>Stuck on billing issues, character recovery, or installation errors? Email us directly.</p>
+                                    <a href="mailto:support@vortexstudios.gg" class="cic-link">support@vortexstudios.gg</a>
+                                </div>
+                            </div>
+                            
+                            <div class="contact-info-card glass-card">
+                                <i class="fa-solid fa-briefcase cic-icon accent-purple"></i>
+                                <div class="cic-content">
+                                    <h3>Business Partnerships</h3>
+                                    <p>For sponsorship, tournament collaborations, or licensing opportunities.</p>
+                                    <a href="mailto:biz@vortexstudios.gg" class="cic-link">biz@vortexstudios.gg</a>
+                                </div>
+                            </div>
+
+                            <div class="contact-info-card glass-card">
+                                <i class="fa-solid fa-location-dot cic-icon accent-amber"></i>
+                                <div class="cic-content">
+                                    <h3>Vortex HQ</h3>
+                                    <p>Vortex Studios, Inc.<br>701 Brazos St, Suite 400<br>Austin, TX 78701, USA</p>
+                                </div>
+                            </div>
+
+                            <!-- Social Dashboard with Glowing Brand animations -->
+                            <div class="social-dashboard-card glass-card">
+                                <h3>Secure Social Subsystem</h3>
+                                <p>Tune in to live broadcasts, join discussion boards, and read updates on our primary hubs.</p>
+                                <div class="social-links-grid">
+                                    <a href="https://discord.gg/vortex" class="social-link-btn discord" target="_blank" rel="noopener noreferrer">
+                                        <i class="fa-brands fa-discord"></i>
+                                        <span>Discord</span>
+                                    </a>
+                                    <a href="https://twitch.tv/vortex" class="social-link-btn twitch" target="_blank" rel="noopener noreferrer">
+                                        <i class="fa-brands fa-twitch"></i>
+                                        <span>Twitch</span>
+                                    </a>
+                                    <a href="https://twitter.com/vortexstudios" class="social-link-btn twitter" target="_blank" rel="noopener noreferrer">
+                                        <i class="fa-brands fa-x-twitter"></i>
+                                        <span>Twitter</span>
+                                    </a>
+                                    <a href="https://youtube.com/vortexgames" class="social-link-btn youtube" target="_blank" rel="noopener noreferrer">
+                                        <i class="fa-brands fa-youtube"></i>
+                                        <span>YouTube</span>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Full Interactive Contact Form -->
+                        <div class="contact-form-column glass-card">
+                            <div class="cf-header">
+                                <h2>Initialize Comm Transmission</h2>
+                                <p>Provide exact variables below to encrypt and transmit your message directly to our servers.</p>
+                            </div>
+                            
+                            <form id="contact-form" novalidate>
+                                <div class="form-row">
+                                    <!-- Gamer Name/Alias -->
+                                    <div class="form-group">
+                                        <label for="form-name">Gamer Tag / Name</label>
+                                        <div class="input-wrapper">
+                                            <i class="fa-solid fa-user input-icon"></i>
+                                            <input type="text" id="form-name" placeholder="e.g. ViperX or Master Chief" required>
+                                        </div>
+                                        <span class="validation-error" id="error-name">Gamer tag is required.</span>
+                                    </div>
+                                    <!-- Email Address -->
+                                    <div class="form-group">
+                                        <label for="form-email">Comm Address (Email)</label>
+                                        <div class="input-wrapper">
+                                            <i class="fa-solid fa-envelope input-icon"></i>
+                                            <input type="email" id="form-email" placeholder="e.g. pilot@orbit.net" required>
+                                        </div>
+                                        <span class="validation-error" id="error-email">Please provide a valid comm address.</span>
+                                    </div>
+                                </div>
+
+                                <div class="form-row">
+                                    <!-- Department Selector -->
+                                    <div class="form-group">
+                                        <label for="form-dept">Target Department</label>
+                                        <div class="input-wrapper">
+                                            <i class="fa-solid fa-network-wired input-icon"></i>
+                                            <select id="form-dept" required>
+                                                <option value="" disabled selected>Select Sector...</option>
+                                                <option value="technical">Game Bugs & Technical Support</option>
+                                                <option value="billing">Store & Payment Inquiries</option>
+                                                <option value="esports">Tournaments & League Inquiries</option>
+                                                <option value="bizdev">Business Partnership Proposal</option>
+                                                <option value="career">Careers & Recruitment</option>
+                                            </select>
+                                        </div>
+                                        <span class="validation-error" id="error-dept">Please select a destination sector.</span>
+                                    </div>
+                                    <!-- Priority Indicator -->
+                                    <div class="form-group">
+                                        <label for="form-priority">Severity / Priority</label>
+                                        <div class="input-wrapper">
+                                            <i class="fa-solid fa-triangle-exclamation input-icon"></i>
+                                            <select id="form-priority">
+                                                <option value="low">Low (Standard Comm)</option>
+                                                <option value="medium" selected>Medium (Need Help)</option>
+                                                <option value="high">High (Blocked / Server Issue)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Text Area Message -->
+                                <div class="form-group">
+                                    <label for="form-message">Transmission Payload (Message)</label>
+                                    <div class="input-wrapper textarea">
+                                        <i class="fa-solid fa-message input-icon textarea-icon"></i>
+                                        <textarea id="form-message" rows="6" placeholder="Construct message payload here..." required></textarea>
+                                    </div>
+                                    <span class="validation-error" id="error-message">Message payload cannot be empty.</span>
+                                </div>
+
+                                <!-- Action buttons -->
+                                <button type="submit" class="btn btn-primary btn-glow btn-block" id="form-submit-btn">
+                                    <span id="submit-btn-text"><i class="fa-solid fa-paper-plane"></i> Transmit Securely</span>
+                                    <div class="spinner" id="submit-btn-spinner" style="display: none;"></div>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </section>
+            </main>
+
+            <!-- ================= SYSTEM FOOTER ================= -->
+            <footer class="app-footer">
+                <div class="footer-grid">
+                    <div class="footer-brand-column">
+                        <div class="brand-logo">
+                            <i class="fa-solid fa-square-virus logo-icon text-gradient"></i>
+                            <span class="brand-text">VORTEX STUDIOS</span>
+                        </div>
+                        <p class="brand-pitch">Engineering legendary digital dimensions and setting player-first standards since 2024.</p>
+                        <div class="footer-socials">
+                            <a href="#discord" class="footer-soc-link" aria-label="Discord"><i class="fa-brands fa-discord"></i></a>
+                            <a href="#twitch" class="footer-soc-link" aria-label="Twitch"><i class="fa-brands fa-twitch"></i></a>
+                            <a href="#twitter" class="footer-soc-link" aria-label="Twitter"><i class="fa-brands fa-twitter"></i></a>
+                            <a href="#youtube" class="footer-soc-link" aria-label="YouTube"><i class="fa-brands fa-youtube"></i></a>
+                        </div>
+                    </div>
+                    <div class="footer-links-column">
+                        <h4>Gaming Verticals</h4>
+                        <ul>
+                            <li><a href="#games" data-nav="games">Cyberpunk Shooter</a></li>
+                            <li><a href="#games" data-nav="games">Open World RPG</a></li>
+                            <li><a href="#games" data-nav="games">Strategy Deckbuilder</a></li>
+                            <li><a href="#games" data-nav="games">Arcade Racer</a></li>
+                        </ul>
+                    </div>
+                    <div class="footer-links-column">
+                        <h4>Resources</h4>
+                        <ul>
+                            <li><a href="#blog" data-nav="blog">Esports Tournaments</a></li>
+                            <li><a href="#blog" data-nav="blog">Developer Diaries</a></li>
+                            <li><a href="#blog" data-nav="blog">Balance Logs</a></li>
+                            <li><a href="#contact" data-nav="contact">Submit Support Ticket</a></li>
+                        </ul>
+                    </div>
+                    <div class="footer-links-column">
+                        <h4>Security & Systems</h4>
+                        <ul>
+                            <li><a href="#status" id="sys-status-chk">Live Node Status: <span class="text-green">All Systems Nominal</span></a></li>
+                            <li><a href="#privacy">Gamer Privacy Protocol</a></li>
+                            <li><a href="#terms">Terms of Comm Licensure</a></li>
+                            <li><a href="#cookie">Opt-out cookie controls</a></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="footer-bottom">
+                    <p>&copy; 2026 Vortex Studios, Inc. All rights reserved. VORTEX, VORTEX STUDIOS, and all related logos are trademarks of Vortex Studios, Inc. in the US and/or other countries.</p>
+                </div>
+            </footer>
+        </div>
+    </div>
+
+    <!-- ======================================================= -->
+    <!-- ================== DYNAMIC INTERACTIVE MODALS ================== -->
+    <!-- ======================================================= -->
+
+    <!-- Tournament Registration Overlay Modal -->
+    <div class="modal-backdrop" id="tournament-modal">
+        <div class="modal-card glass-card">
+            <button class="modal-close" id="tournament-modal-close" aria-label="Close Modal">&times;</button>
+            <div class="modal-header-glowing pink">
+                <i class="fa-solid fa-trophy modal-icon"></i>
+                <h2>League Championship Registration</h2>
+            </div>
+            <div class="modal-body">
+                <p>Register your gaming roster for <strong id="t-modal-title">Tournament Name</strong>. Submitting this reservation locks a competitive seeding slot.</p>
+                
+                <div class="t-modal-quick-stats">
+                    <div class="quick-stat">
+                        <span class="qs-lbl">Prize Pool</span>
+                        <span class="qs-val accent-pink" id="t-modal-prize">$5,000</span>
+                    </div>
+                    <div class="quick-stat">
+                        <span class="qs-lbl">Start Time</span>
+                        <span class="qs-val" id="t-modal-date">June 15, 2026</span>
+                    </div>
+                    <div class="quick-stat">
+                        <span class="qs-lbl">Capacity Slot</span>
+                        <span class="qs-val" id="t-modal-slots">14/32 Filled</span>
+                    </div>
+                </div>
+
+                <form id="tournament-registration-form">
+                    <input type="hidden" id="t-modal-id">
+                    <div class="form-group">
+                        <label for="t-roster-name">Squad / Competitive Roster Name</label>
+                        <div class="input-wrapper">
+                            <i class="fa-solid fa-shield-halved input-icon"></i>
+                            <input type="text" id="t-roster-name" placeholder="e.g. Vanguard Apex Crew" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="t-captain-discord">Team Representative Discord Handle</label>
+                        <div class="input-wrapper">
+                            <i class="fa-brands fa-discord input-icon"></i>
+                            <input type="text" id="t-captain-discord" placeholder="e.g. Captain#1234 or captain.gg" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="t-roster-region">Server Combat Region</label>
+                        <div class="input-wrapper">
+                            <i class="fa-solid fa-earth-americas input-icon"></i>
+                            <select id="t-roster-region" required>
+                                <option value="NA-East">North America East (Ping: 14ms)</option>
+                                <option value="NA-West">North America West (Ping: 32ms)</option>
+                                <option value="EU-Central">Europe Central (Ping: 45ms)</option>
+                                <option value="APAC-East">Asia Pacific East (Ping: 78ms)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-glow btn-block" id="tournament-submit-btn">
+                        <span>Confirm Competitive Seeding Slot</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Detail Showcase & Media Modal -->
+    <div class="modal-backdrop" id="game-detail-modal">
+        <div class="modal-card wide glass-card scrollable">
+            <button class="modal-close" id="game-modal-close" aria-label="Close Modal">&times;</button>
+            <div class="gdm-banner" id="gdm-banner-img">
+                <div class="gdm-banner-overlay"></div>
+                <div class="gdm-banner-content">
+                    <span class="badge-gaming" id="gdm-genre">RPG</span>
+                    <h2 id="gdm-title">Game Title</h2>
+                    <p id="gdm-tagline">Short thrilling description of the game</p>
+                </div>
+            </div>
+            
+            <div class="modal-body no-padding">
+                <div class="gdm-layout-grid">
+                    
+                    <!-- Left: Description and Media Elements -->
+                    <div class="gdm-left">
+                        <div class="gdm-section">
+                            <h3>Combat Objective & Features</h3>
+                            <p id="gdm-full-desc">Full comprehensive overview...</p>
+                            <div class="gdm-key-features" id="gdm-features">
+                                <!-- Loaded dynamically via JS -->
+                            </div>
+                        </div>
+
+                        <!-- Immersive Image Carousel & Media Gallery -->
+                        <div class="gdm-section">
+                            <h3>Visual Capture & Intel (Media)</h3>
+                            <div class="media-carousel-container">
+                                <div class="media-carousel" id="gdm-carousel-track">
+                                    <!-- Injected dynamically via JS -->
+                                </div>
+                                <button class="carousel-nav-btn prev" id="gdm-carousel-prev"><i class="fa-solid fa-chevron-left"></i></button>
+                                <button class="carousel-nav-btn next" id="gdm-carousel-next"><i class="fa-solid fa-chevron-right"></i></button>
+                            </div>
+                            <div class="carousel-dots" id="gdm-carousel-dots"></div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Game Specifications and Direct Download Links -->
+                    <div class="gdm-right">
+                        <div class="gdm-card-action">
+                            <h3>Client Launch Array</h3>
+                            
+                            <!-- Custom Download Progress Dashboard -->
+                            <div class="download-speedometer" id="game-download-speedometer" style="display: none;">
+                                <div class="ds-meta">
+                                    <span id="game-download-status">Synchronizing Files...</span>
+                                    <span id="game-download-pct">0%</span>
+                                </div>
+                                <div class="ds-bar">
+                                    <div class="ds-bar-fill" id="game-download-bar-fill" style="width: 0%;"></div>
+                                </div>
+                                <div class="ds-details">
+                                    <span id="game-download-speed">0.0 MB/s</span>
+                                    <span id="game-download-eta">ETA: Calculating</span>
+                                </div>
+                            </div>
+                            
+                            <button class="btn btn-primary btn-glow btn-block" id="gdm-download-btn">
+                                <i class="fa-solid fa-cloud-arrow-down"></i> Launch / Play Client
+                            </button>
+                            <button class="btn btn-secondary btn-block" id="gdm-browser-btn">
+                                <i class="fa-solid fa-window-maximize"></i> Play Instantly in Browser
+                            </button>
+
+                            <div class="specs-list">
+                                <div class="spec-row">
+                                    <span>Engine Platform</span>
+                                    <span class="val" id="gdm-platform">PC, Console</span>
+                                </div>
+                                <div class="spec-row">
+                                    <span>Active Players</span>
+                                    <span class="val text-gradient" id="gdm-players">450k Active</span>
+                                </div>
+                                <div class="spec-row">
+                                    <span>Minimum GPU</span>
+                                    <span class="val" id="gdm-gpu">RTX 3060 / RX 6600</span>
+                                </div>
+                                <div class="spec-row">
+                                    <span>Disk Space Needed</span>
+                                    <span class="val" id="gdm-disk">45 GB</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Gamer Profile Modal -->
+    <div class="modal-backdrop" id="profile-edit-modal">
+        <div class="modal-card glass-card">
+            <button class="modal-close" id="profile-modal-close" aria-label="Close Modal">&times;</button>
+            <div class="modal-header-glowing purple">
+                <i class="fa-solid fa-user-pen modal-icon"></i>
+                <h2>Modify Gamer Profile Identity</h2>
+            </div>
+            <div class="modal-body">
+                <form id="profile-edit-form">
+                    <div class="form-group text-center">
+                        <label>Select Gamer Avatar Avatar</label>
+                        <div class="avatar-select-grid">
+                            <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=Alex" class="avatar-option selected" data-avatar-seed="Alex">
+                            <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=Viper" class="avatar-option" data-avatar-seed="Viper">
+                            <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=Shadow" class="avatar-option" data-avatar-seed="Shadow">
+                            <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=Rage" class="avatar-option" data-avatar-seed="Rage">
+                            <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=Gamer" class="avatar-option" data-avatar-seed="Gamer">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-username">Gamer Handle (Alias)</label>
+                        <div class="input-wrapper">
+                            <i class="fa-solid fa-user input-icon"></i>
+                            <input type="text" id="edit-username" placeholder="Alex Ryan" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-tag">Gamer Handle Tag (e.g. @tag)</label>
+                        <div class="input-wrapper">
+                            <i class="fa-solid fa-at input-icon"></i>
+                            <input type="text" id="edit-tag" placeholder="alex.gg" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-glow btn-block">
+                        <span>Save & Synchronize Identity</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert / Toast Popup Message Center -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Core Dynamic App Engine Script -->
+    <script src="app.js"></script>
+</body>
+</html>
